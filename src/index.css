@@ -54,6 +54,18 @@ body {
   margin: 0;
 }
 
+/* ── Stampa ────────────────────────────────────────────────── */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
+
 #root {
   width: 100%;
   min-height: 100svh;

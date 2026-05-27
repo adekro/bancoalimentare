@@ -46,6 +46,7 @@ export default function AppLayout() {
       {isMobile && (
         <AppBar
           position="fixed"
+          className="no-print"
           sx={{ zIndex: theme.zIndex.drawer + 1, bgcolor: '#ffffff', color: 'text.primary' }}
           elevation={0}
         >
@@ -70,6 +71,7 @@ export default function AppLayout() {
       {isMobile ? (
         <Drawer
           variant="temporary"
+          className="no-print"
           open={mobileOpen}
           onClose={handleDrawerToggle}
           ModalProps={{ keepMounted: true }}
@@ -85,6 +87,7 @@ export default function AppLayout() {
       ) : (
         <Drawer
           variant="permanent"
+          className="no-print"
           sx={{
             width: DRAWER_WIDTH,
             flexShrink: 0,
