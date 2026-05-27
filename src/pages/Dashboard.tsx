@@ -104,7 +104,7 @@ export default function Dashboard() {
       const zonaData = Object.entries(zonaCounts).map(([name, valore]) => ({ name, valore }))
 
       // Tessere: iscrizioni valide vs scadute
-      const oggi = new Date().toISOString().slice(0, 10)
+      const oggiIso = new Date().toISOString().slice(0, 10)
       const { data: iscrRows } = await supabase
         .from('iscrizioni')
         .select('data_scadenza')
@@ -112,7 +112,7 @@ export default function Dashboard() {
       let valide = 0
       let scadute = 0
       iscrRows?.forEach((t: { data_scadenza: string | null }) => {
-        if (t.data_scadenza && t.data_scadenza >= oggi) valide++
+        if (t.data_scadenza && t.data_scadenza >= oggiIso) valide++
         else scadute++
       })
       const tessData: TesseraRow[] = [
