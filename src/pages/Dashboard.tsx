@@ -158,10 +158,10 @@ export default function Dashboard() {
       </Typography>
 
       {/* ---- Stat cards ---- */}
-      <Grid container spacing={3} mb={4}>
+      <Grid container spacing={3} mb={5}>
         {statCards.map((s) => (
           <Grid item xs={12} sm={6} md={4} key={s.label}>
-            <Paper sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Paper sx={{ p: 4, display: 'flex', alignItems: 'center', gap: 3, minHeight: 100 }}>
               {s.icon}
               <Box>
                 <Typography variant="h4" fontWeight={700}>{s.value}</Typography>
@@ -177,13 +177,13 @@ export default function Dashboard() {
           <CircularProgress />
         </Box>
       ) : (
-        <Grid container spacing={3}>
+        <Grid container spacing={4}>
 
           {/* ---- Fasce di età ---- */}
           <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3 }}>
+            <Paper sx={{ p: 4 }}>
               <Typography variant="h6" gutterBottom>Componenti per fascia d'età</Typography>
-              <ResponsiveContainer width="100%" height={280}>
+              <ResponsiveContainer width="100%" height={320}>
                 <BarChart data={fasciaEta} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="name" tick={{ fontSize: 13 }} />
@@ -201,9 +201,9 @@ export default function Dashboard() {
 
           {/* ---- Zone ---- */}
           <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3 }}>
+            <Paper sx={{ p: 4 }}>
               <Typography variant="h6" gutterBottom>Nuclei per zona</Typography>
-              <ResponsiveContainer width="100%" height={280}>
+              <ResponsiveContainer width="100%" height={320}>
                 <PieChart>
                   <Pie
                     data={zone}
@@ -228,9 +228,9 @@ export default function Dashboard() {
 
           {/* ---- Tessere rinnovate ---- */}
           <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3 }}>
+            <Paper sx={{ p: 4 }}>
               <Typography variant="h6" gutterBottom>Tessere: valide vs scadute</Typography>
-              <ResponsiveContainer width="100%" height={280}>
+              <ResponsiveContainer width="100%" height={320}>
                 <PieChart>
                   <Pie
                     data={tesseraStats}
