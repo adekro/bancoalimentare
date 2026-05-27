@@ -19,18 +19,22 @@ type PersonaForm = {
   nome: string
   cognome: string
   data_nascita: string
+  nazione_nascita: string
   nazionalita: string
   sesso: 'M' | 'F' | ''
   paesi_terzi_ue: boolean
+  invalido: boolean
 }
 
 const PERSONA_VUOTA: PersonaForm = {
   nome: '',
   cognome: '',
   data_nascita: '',
+  nazione_nascita: '',
   nazionalita: '',
   sesso: '',
   paesi_terzi_ue: false,
+  invalido: false,
 }
 
 function calcFascia(dataNascita: string): '0-17' | '18-29' | '30-64' | '65+' | null {
@@ -76,9 +80,15 @@ function SezionePersona({
           sx={{ flex: 1, minWidth: 160 }}
         />
         <NationalityAutocomplete
+          value={value.nazione_nascita}
+          onChange={(newValue) => onChange({ ...value, nazione_nascita: newValue })}
+          label="Nazione di nascita"
+          sx={{ flex: 1, minWidth: 160 }}
+        />
+        <NationalityAutocomplete
           value={value.nazionalita}
           onChange={(newValue) => onChange({ ...value, nazionalita: newValue })}
-          label="Nazionalita"
+          label="Nazionalità"
           sx={{ flex: 1, minWidth: 160 }}
         />
         <TextField
@@ -93,16 +103,28 @@ function SezionePersona({
           <MenuItem value="F">Femmina</MenuItem>
         </TextField>
       </Stack>
-      <FormControlLabel
-        control={(
-          <Checkbox
-            checked={value.paesi_terzi_ue}
-            onChange={(e) => onChange({ ...value, paesi_terzi_ue: e.target.checked })}
-          />
-        )}
-        label="Paesi terzi UE (extra-UE)"
-        sx={{ mt: 1.2 }}
-      />
+      <Stack direction="row" sx={{ gap: 1 }}>
+        <FormControlLabel
+          control={(
+            <Checkbox
+              checked={value.paesi_terzi_ue}
+              onChange={(e) => onChange({ ...value, paesi_terzi_ue: e.target.checked })}
+            />
+          )}
+          label="Paesi terzi UE (extra-UE)"
+          sx={{ mt: 1.2 }}
+        />
+        <FormControlLabel
+          control={(
+            <Checkbox
+              checked={value.invalido}
+              onChange={(e) => onChange({ ...value, invalido: e.target.checked })}
+            />
+          )}
+          label="Invalido"
+          sx={{ mt: 1.2 }}
+        />
+      </Stack>
     </Box>
   )
 }
@@ -182,9 +204,11 @@ export default function NuovoUtente() {
         cognome: capofamiglia.cognome,
         codice_fiscale: stessoSoggetto ? cfNorm : null,
         data_nascita: capofamiglia.data_nascita || null,
+        nazione_nascita: capofamiglia.nazione_nascita || null,
         nazionalita: capofamiglia.nazionalita || null,
         sesso: capofamiglia.sesso || null,
         paesi_terzi_ue: capofamiglia.paesi_terzi_ue,
+        invalido: capofamiglia.invalido,
         fascia_eta: calcFascia(capofamiglia.data_nascita),
       },
     ]
@@ -197,9 +221,11 @@ export default function NuovoUtente() {
         cognome: titolare.cognome,
         codice_fiscale: cfNorm,
         data_nascita: titolare.data_nascita || null,
+        nazione_nascita: titolare.nazione_nascita || null,
         nazionalita: titolare.nazionalita || null,
         sesso: titolare.sesso || null,
         paesi_terzi_ue: titolare.paesi_terzi_ue,
+        invalido: titolare.invalido,
         fascia_eta: calcFascia(titolare.data_nascita),
       })
     }
@@ -213,9 +239,11 @@ export default function NuovoUtente() {
           cognome: c.cognome,
           codice_fiscale: null,
           data_nascita: c.data_nascita || null,
+          nazione_nascita: c.nazione_nascita || null,
           nazionalita: c.nazionalita || null,
           sesso: c.sesso || null,
           paesi_terzi_ue: c.paesi_terzi_ue,
+          invalido: c.invalido,
           fascia_eta: calcFascia(c.data_nascita),
         })
       }
