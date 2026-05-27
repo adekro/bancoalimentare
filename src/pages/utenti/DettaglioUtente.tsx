@@ -29,17 +29,21 @@ type PersonaForm = {
   nome: string
   cognome: string
   data_nascita: string
+  nazione_nascita: string
   nazionalita: string
   sesso: 'M' | 'F' | ''
   paesi_terzi_ue: boolean
+  invalido: boolean
 }
 const PERSONA_VUOTA: PersonaForm = {
   nome: '',
   cognome: '',
   data_nascita: '',
+  nazione_nascita: '',
   nazionalita: '',
   sesso: '',
   paesi_terzi_ue: false,
+  invalido: false,
 }
 
 function calcFascia(dataNascita: string): '0-17' | '18-29' | '30-64' | '65+' | null {
@@ -62,28 +66,84 @@ function normalizzaData(s: string): string {
   return s.trim()
 }
 
-/** Parsing copia-incolla da Excel (colonne tab-separate: Cognome, Nome, DataNascita, Nazionalità) */
+function normalizeHeaderCell(v: string): string {
+  return v
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase()
+}
+
+function normBool(v: string): boolean {
+  return ['X', 'SI', 'S', 'YES', 'Y', '1', 'TRUE'].includes(v.toUpperCase())
+}
+
+/** Parsing copia-incolla da Excel — supporta sia il vecchio formato 4 colonne
+ *  sia il nuovo formato 2026 con intestazione (Cognome, Nome, Naz.Nascita, M/F,
+ *  DataNascita, …, INV, …, Nazionalità, PaesiTerzi, …) */
 function parseExcel(text: string): PersonaForm[] {
   const righe = text
     .split(/\r?\n/)
     .map((r) => r.split('\t').map((c) => c.trim()))
     .filter((r) => r.length >= 2 && r.some(Boolean))
 
-  // Salta eventuale riga di intestazione
-  const prima = righe[0]
-  const isHeader =
-    prima &&
-    ['cognome', 'nome', 'cf', 'cod'].some((k) => prima[0]?.toLowerCase().includes(k))
-  const dati = isHeader ? righe.slice(1) : righe
+  if (righe.length === 0) return []
 
-  return dati.map((r) => ({
-    cognome:      r[0] ?? '',
-    nome:         r[1] ?? '',
-    data_nascita: r[2] ? normalizzaData(r[2]) : '',
-    nazionalita:  r[3] ?? '',
-    sesso: '',
-    paesi_terzi_ue: false,
-  }))
+  const primaNorm = righe[0].map(normalizeHeaderCell)
+  const cogIdx = primaNorm.findIndex((c) => c.includes('COGNOME'))
+  const nomIdx = primaNorm.findIndex((c) => c === 'NOME' || c.startsWith('NOME '))
+
+  let headerIdx = -1
+  let iCognome = 0, iNome = 1, iDataNascita = 2, iNazNascita = -1
+  let iNazionalita = 3, iSesso = -1, iPaesiTerzi = -1, iInvalido = -1
+
+  if (cogIdx >= 0 && nomIdx >= 0) {
+    // Riga di intestazione rilevata: mappatura per nome colonna
+    headerIdx = 0
+    iCognome    = cogIdx
+    iNome       = nomIdx
+    iDataNascita = primaNorm.findIndex((c) => c === 'DATA' || c.includes('DATA NASCITA'))
+    iNazNascita  = primaNorm.findIndex((c) => c === 'NAZ NASCITA' || c.startsWith('NAZ NASCITA'))
+    iNazionalita = primaNorm.findIndex((c) => c === 'NAZIONALITA')
+    iSesso       = primaNorm.findIndex((c) => c === 'M F' || c === 'SESSO' || c === 'SEX')
+    iPaesiTerzi  = primaNorm.findIndex((c) => c === 'PAESI TERZI' || c.includes('PAESI TERZI UE') || c.includes('EXTRA UE'))
+    iInvalido    = primaNorm.findIndex((c) => c === 'INV')
+    if (iNazionalita < 0) iNazionalita = iNazNascita
+  } else {
+    // Nessuna intestazione: rilevamento per numero di colonne
+    const ncol = righe[0].length
+    if (ncol >= 18) {
+      // Formato 2026: NR | GR | Cognome | Nome | NazNascita | M/F | DataNascita | anno | eta
+      //               | Tess | CompSimb | NrComp | ScadTess | INV | Tel | Ind | CF
+      //               | Nazionalita | PaesiTerzi | UE | GruppoFam
+      iCognome = 2; iNome = 3; iNazNascita = 4; iSesso = 5
+      iDataNascita = 6; iInvalido = 13; iNazionalita = 17; iPaesiTerzi = 18
+    }
+    // Controlla intestazione vecchio stile (prima colonna = 'cognome')
+    const isOldHeader = ['cognome', 'nome', 'cf', 'cod'].some(
+      (k) => righe[0][0]?.toLowerCase().includes(k)
+    )
+    if (isOldHeader) headerIdx = 0
+  }
+
+  const dati = headerIdx >= 0 ? righe.slice(1) : righe
+
+  return dati
+    .filter((r) => r.some(Boolean))
+    .map((r) => ({
+      cognome:        r[iCognome] ?? '',
+      nome:           r[iNome] ?? '',
+      data_nascita:   iDataNascita >= 0 && r[iDataNascita] ? normalizzaData(r[iDataNascita]) : '',
+      nazione_nascita: iNazNascita >= 0 ? (r[iNazNascita] ?? '') : '',
+      nazionalita:    iNazionalita >= 0 ? (r[iNazionalita] ?? '') : '',
+      sesso:          iSesso >= 0 && ['M', 'F'].includes((r[iSesso] ?? '').toUpperCase())
+        ? (r[iSesso].toUpperCase() as PersonaForm['sesso'])
+        : '',
+      paesi_terzi_ue: iPaesiTerzi >= 0 ? normBool(r[iPaesiTerzi] ?? '') : false,
+      invalido:       iInvalido >= 0 ? normBool(r[iInvalido] ?? '') : false,
+    }))
 }
 
 // ---- Sub-componente form persona ----
@@ -115,9 +175,15 @@ function SezionePersona({
           sx={{ flex: 1, minWidth: 160 }}
         />
         <NationalityAutocomplete
+          value={value.nazione_nascita}
+          onChange={(newValue) => onChange({ ...value, nazione_nascita: newValue })}
+          label="Nazione di nascita"
+          sx={{ flex: 1, minWidth: 160 }}
+        />
+        <NationalityAutocomplete
           value={value.nazionalita}
           onChange={(newValue) => onChange({ ...value, nazionalita: newValue })}
-          label="Nazionalita"
+          label="Nazionalità"
           sx={{ flex: 1, minWidth: 160 }}
         />
         <TextField
@@ -132,15 +198,26 @@ function SezionePersona({
           <MenuItem value="F">Femmina</MenuItem>
         </TextField>
       </Stack>
-      <FormControlLabel
-        control={(
-          <Switch
-            checked={value.paesi_terzi_ue}
-            onChange={(e) => onChange({ ...value, paesi_terzi_ue: e.target.checked })}
-          />
-        )}
-        label="Paesi terzi UE (extra-UE)"
-      />
+      <Stack direction="row" sx={{ gap: 1 }}>
+        <FormControlLabel
+          control={(
+            <Switch
+              checked={value.paesi_terzi_ue}
+              onChange={(e) => onChange({ ...value, paesi_terzi_ue: e.target.checked })}
+            />
+          )}
+          label="Paesi terzi UE (extra-UE)"
+        />
+        <FormControlLabel
+          control={(
+            <Switch
+              checked={value.invalido}
+              onChange={(e) => onChange({ ...value, invalido: e.target.checked })}
+            />
+          )}
+          label="Invalido"
+        />
+      </Stack>
     </Box>
   )
 }
@@ -220,9 +297,11 @@ export default function DettaglioUtente() {
           nome: capoFound.nome ?? '',
           cognome: capoFound.cognome ?? '',
           data_nascita: capoFound.data_nascita ?? '',
+          nazione_nascita: capoFound.nazione_nascita ?? '',
           nazionalita: capoFound.nazionalita ?? '',
           sesso: capoFound.sesso ?? '',
           paesi_terzi_ue: Boolean(capoFound.paesi_terzi_ue),
+          invalido: Boolean(capoFound.invalido),
         })
       }
       setStessoSoggetto(!titolFound)
@@ -231,9 +310,11 @@ export default function DettaglioUtente() {
           nome: titolFound.nome ?? '',
           cognome: titolFound.cognome ?? '',
           data_nascita: titolFound.data_nascita ?? '',
+          nazione_nascita: titolFound.nazione_nascita ?? '',
           nazionalita: titolFound.nazionalita ?? '',
           sesso: titolFound.sesso ?? '',
           paesi_terzi_ue: Boolean(titolFound.paesi_terzi_ue),
+          invalido: Boolean(titolFound.invalido),
         })
       }
 
@@ -245,17 +326,21 @@ export default function DettaglioUtente() {
           nome: string
           cognome: string
           data_nascita: string | null
+          nazione_nascita: string | null
           nazionalita: string | null
           sesso: 'M' | 'F' | null
           paesi_terzi_ue: boolean
+          invalido: boolean
           codice_fiscale?: string | null
         }) => ({
           nome: c.nome ?? '',
           cognome: c.cognome ?? '',
           data_nascita: c.data_nascita ?? '',
+          nazione_nascita: c.nazione_nascita ?? '',
           nazionalita: c.nazionalita ?? '',
           sesso: c.sesso ?? '',
           paesi_terzi_ue: Boolean(c.paesi_terzi_ue),
+          invalido: Boolean(c.invalido),
         }))
       )
 
@@ -326,9 +411,11 @@ export default function DettaglioUtente() {
         cognome: capofamiglia.cognome,
         codice_fiscale: stessoSoggetto ? cfNorm : null,
         data_nascita: capofamiglia.data_nascita || null,
+        nazione_nascita: capofamiglia.nazione_nascita || null,
         nazionalita: capofamiglia.nazionalita || null,
         sesso: capofamiglia.sesso || null,
         paesi_terzi_ue: capofamiglia.paesi_terzi_ue,
+        invalido: capofamiglia.invalido,
         fascia_eta: calcFascia(capofamiglia.data_nascita),
       },
     ]
@@ -340,9 +427,11 @@ export default function DettaglioUtente() {
         cognome: titolare.cognome,
         codice_fiscale: cfNorm,
         data_nascita: titolare.data_nascita || null,
+        nazione_nascita: titolare.nazione_nascita || null,
         nazionalita: titolare.nazionalita || null,
         sesso: titolare.sesso || null,
         paesi_terzi_ue: titolare.paesi_terzi_ue,
+        invalido: titolare.invalido,
         fascia_eta: calcFascia(titolare.data_nascita),
       })
     }
@@ -355,9 +444,11 @@ export default function DettaglioUtente() {
           cognome: c.cognome,
           codice_fiscale: null,
           data_nascita: c.data_nascita || null,
+          nazione_nascita: c.nazione_nascita || null,
           nazionalita: c.nazionalita || null,
           sesso: c.sesso || null,
           paesi_terzi_ue: c.paesi_terzi_ue,
+          invalido: c.invalido,
           fascia_eta: calcFascia(c.data_nascita),
         })
       }
@@ -651,6 +742,8 @@ export default function DettaglioUtente() {
             <br />
             <strong>Cognome [TAB] Nome [TAB] Data nascita [TAB] Nazionalità</strong>
             <br />
+            oppure, copiando direttamente dal file FEAD 2026, vengono rilevate automaticamente
+            tutte le colonne (Nazione di nascita, Nazionalità, Sesso, Invalido, Paesi Terzi).
             La data può essere nel formato GG/MM/AAAA oppure AAAA-MM-GG.
             Se la prima riga è un'intestazione viene ignorata automaticamente.
           </Typography>
