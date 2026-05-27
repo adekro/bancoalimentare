@@ -32,9 +32,11 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import NoteIcon from '@mui/icons-material/Note'
 import NoteOutlinedIcon from '@mui/icons-material/NoteOutlined'
 import UndoIcon from '@mui/icons-material/Undo'
+import HistoryIcon from '@mui/icons-material/History'
 import type { StatoNucleo } from '@/hooks/useDistribuzione'
 import { ZONE_DISTRIBUZIONE, useDistribuzione } from '@/hooks/useDistribuzione'
 import { useAuth } from '@/hooks/useAuth'
+import StoricoDistribuzioniDialog from '@/components/common/StoricoDistribuzioniDialog'
 
 const STATO_FILTER: Array<{ value: StatoNucleo | ''; label: string }> = [
   { value: '', label: 'Tutti gli stati' },
@@ -103,6 +105,7 @@ export default function Distribuzione() {
   const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null)
   const [notaDialog, setNotaDialog] = useState<NotaDialogState | null>(null)
   const [sbloccoDialog, setSbloccoDialog] = useState<SbloccoDialogState | null>(null)
+  const [storicoDistNucleoId, setStoricoDistNucleoId] = useState<{ id: string; label: string } | null>(null)
   const undoTimeoutRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -327,7 +330,7 @@ export default function Distribuzione() {
               <TableCell>Tessera</TableCell>
               <TableCell>Stato</TableCell>
               <TableCell>Ultima distribuzione</TableCell>
-              <TableCell align="center">Nota</TableCell>
+              <TableCell align="center">Nota / Storico</TableCell>
               <TableCell align="right">Azione</TableCell>
             </TableRow>
           </TableHead>
@@ -412,6 +415,19 @@ export default function Distribuzione() {
                             {row.haNotaDistribuzione ? <NoteIcon fontSize="small" /> : <NoteOutlinedIcon fontSize="small" />}
                           </IconButton>
                         </span>
+                      </Tooltip>
+                      <Tooltip title="Storico distribuzioni">
+                        <IconButton
+                          size="small"
+                          onClick={() =>
+                            setStoricoDistNucleoId({
+                              id: row.nucleoId,
+                              label: `${row.cognomeTesserato} ${row.nomeTesserato}`.trim(),
+                            })
+                          }
+                        >
+                          <HistoryIcon fontSize="small" />
+                        </IconButton>
                       </Tooltip>
                     </TableCell>
                     <TableCell align="right">
@@ -525,6 +541,12 @@ export default function Distribuzione() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <StoricoDistribuzioniDialog
+        nucleoId={storicoDistNucleoId?.id ?? null}
+        nucleoLabel={storicoDistNucleoId?.label}
+        onClose={() => setStoricoDistNucleoId(null)}
+      />
 
       <Dialog
         open={Boolean(sbloccoDialog?.open)}

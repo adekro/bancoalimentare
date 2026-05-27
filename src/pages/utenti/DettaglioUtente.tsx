@@ -20,6 +20,7 @@ import { supabase } from '@/api/supabase'
 import StatusChip from '@/components/common/StatusChip'
 import type { StatoNucleo } from '@/components/common/StatusChip'
 import NationalityAutocomplete from '@/components/common/NationalityAutocomplete'
+import StoricoDistribuzioniDialog from '@/components/common/StoricoDistribuzioniDialog'
 
 const ZONE = ['Pombio', 'Duomo', 'Medassino', 'San Rocco']
 const STATI: { value: StatoNucleo; label: string }[] = [
@@ -262,6 +263,9 @@ export default function DettaglioUtente() {
   const [storicoOpen, setStoricoOpen] = useState(false)
   const [nuovaIscrizione, setNuovaIscrizione] = useState({ numero_tessera: '', data_inizio: '', data_scadenza: '', note: '' })
   const [savingIscrizione, setSavingIscrizione] = useState(false)
+
+  // Storico distribuzioni
+  const [storicoDistOpen, setStoricoDistOpen] = useState(false)
 
   // Dialog import Excel
   const [excelOpen, setExcelOpen] = useState(false)
@@ -645,6 +649,15 @@ export default function DettaglioUtente() {
                   <Chip label={iscrizioni.length} size="small" sx={{ ml: 1 }} />
                 )}
               </Button>
+              <Button
+                variant="outlined"
+                color="primary"
+                startIcon={<HistoryIcon />}
+                onClick={() => setStoricoDistOpen(true)}
+                sx={{ alignSelf: 'center', minWidth: 220, height: 56 }}
+              >
+                Storico distribuzioni
+              </Button>
             </Stack>
           </Stack>
           </Box>
@@ -743,6 +756,13 @@ export default function DettaglioUtente() {
         </Paper>
 
       </Stack>
+
+      {/* Dialog storico distribuzioni */}
+      <StoricoDistribuzioniDialog
+        nucleoId={storicoDistOpen ? (id ?? null) : null}
+        nucleoLabel={`${capofamiglia.cognome} ${capofamiglia.nome}`.trim() || undefined}
+        onClose={() => setStoricoDistOpen(false)}
+      />
 
       {/* Dialog storico iscrizioni */}
       <Dialog open={storicoOpen} onClose={() => setStoricoOpen(false)} maxWidth="md" fullWidth>
