@@ -153,18 +153,18 @@ export default function Dashboard() {
   return (
     <Box>
       <Typography variant="h5" gutterBottom>Dashboard</Typography>
-      <Typography variant="body1" color="text.secondary" mb={3}>
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
         Benvenuto nel gestionale del Banco Alimentare.
       </Typography>
 
       {/* ---- Stat cards ---- */}
-      <Grid container spacing={3} mb={5}>
+      <Grid container spacing={3} sx={{ mb: 2.5, alignItems: 'stretch' }}>
         {statCards.map((s) => (
-          <Grid item xs={12} sm={6} md={4} key={s.label}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }} key={s.label}>
             <Paper sx={{ p: 4, display: 'flex', alignItems: 'center', gap: 3, minHeight: 100 }}>
               {s.icon}
               <Box>
-                <Typography variant="h4" fontWeight={700}>{s.value}</Typography>
+                <Typography variant="h4" sx={{ fontWeight: 700 }}>{s.value}</Typography>
                 <Typography variant="body2" color="text.secondary">{s.label}</Typography>
               </Box>
             </Paper>
@@ -177,10 +177,10 @@ export default function Dashboard() {
           <CircularProgress />
         </Box>
       ) : (
-        <Grid container spacing={4}>
+        <Grid container spacing={4} sx={{ mb: 5, alignItems: 'stretch' }}>
 
           {/* ---- Fasce di età ---- */}
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Paper sx={{ p: 4 }}>
               <Typography variant="h6" gutterBottom>Componenti per fascia d'età</Typography>
               <ResponsiveContainer width="100%" height={320}>
@@ -200,7 +200,7 @@ export default function Dashboard() {
           </Grid>
 
           {/* ---- Zone ---- */}
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Paper sx={{ p: 4 }}>
               <Typography variant="h6" gutterBottom>Nuclei per zona</Typography>
               <ResponsiveContainer width="100%" height={320}>
@@ -213,7 +213,7 @@ export default function Dashboard() {
                     cy="50%"
                     outerRadius={100}
                     labelLine={false}
-                    label={PieLabel as React.FC}
+                    label={PieLabel}
                   >
                     {zone.map((entry) => (
                       <Cell key={entry.name} fill={COLOR_ZONE[entry.name] ?? '#888'} />
@@ -227,7 +227,7 @@ export default function Dashboard() {
           </Grid>
 
           {/* ---- Tessere rinnovate ---- */}
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Paper sx={{ p: 4 }}>
               <Typography variant="h6" gutterBottom>Tessere: valide vs scadute</Typography>
               <ResponsiveContainer width="100%" height={320}>
@@ -240,7 +240,7 @@ export default function Dashboard() {
                     cy="50%"
                     outerRadius={100}
                     labelLine={false}
-                    label={PieLabel as React.FC}
+                    label={PieLabel}
                   >
                     {tesseraStats.map((_, i) => (
                       <Cell key={i} fill={COLOR_TESS[i % COLOR_TESS.length]} />
