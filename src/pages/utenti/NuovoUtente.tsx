@@ -142,8 +142,7 @@ export default function NuovoUtente() {
   const [titolare, setTitolare] = useState<PersonaForm>({ ...PERSONA_VUOTA })
   const [componentiExtra, setComponentiExtra] = useState<PersonaForm[]>([])
   const [tessNumero, setTessNumero] = useState('')
-  const [tessScadVecchia, setTessScadVecchia] = useState('')
-  const [tessScadNuova, setTessScadNuova] = useState('')
+  const [tessDataScadenza, setTessDataScadenza] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -256,16 +255,15 @@ export default function NuovoUtente() {
       return
     }
 
-    // 3. Insert tessera (se compilata)
+    // 3. Insert prima iscrizione (se compilata)
     if (tessNumero.trim()) {
-      const { error: tessErr } = await supabase.from('tessere').insert({
+      const { error: iscrErr } = await supabase.from('iscrizioni').insert({
         nucleo_id: nucleoId,
-        numero: tessNumero.trim(),
-        scadenza_vecchia: tessScadVecchia || null,
-        scadenza_nuova: tessScadNuova || null,
+        numero_tessera: tessNumero.trim(),
+        data_scadenza: tessDataScadenza || null,
       })
-      if (tessErr) {
-        setError(tessErr.message)
+      if (iscrErr) {
+        setError(iscrErr.message)
         setLoading(false)
         return
       }
@@ -336,10 +334,10 @@ export default function NuovoUtente() {
                 {ZONE.map((z) => <MenuItem key={z} value={z}>{z}</MenuItem>)}
               </TextField>
               <TextField
-                label="Nuova Scadenza"
+                label="Scadenza Tessera"
                 type="date"
-                value={tessScadNuova}
-                onChange={(e) => setTessScadNuova(e.target.value)}
+                value={tessDataScadenza}
+                onChange={(e) => setTessDataScadenza(e.target.value)}
                 slotProps={{ inputLabel: { shrink: true } }}
                 sx={{
                   flex: 1,
@@ -369,19 +367,6 @@ export default function NuovoUtente() {
                 value={telefono}
                 onChange={(e) => setTelefono(e.target.value)}
                 sx={{ flex: 1, minWidth: { md: 220 } }}
-              />
-              <TextField
-                label="Scadenza Precedente"
-                type="date"
-                value={tessScadVecchia}
-                onChange={(e) => setTessScadVecchia(e.target.value)}
-                slotProps={{ inputLabel: { shrink: true } }}
-                sx={{
-                  flex: 1,
-                  minWidth: { md: 220 },
-                  '& input': { fontSize: '0.97rem' },
-                  '& .MuiInputLabel-root': { px: 0.35, bgcolor: 'background.paper' },
-                }}
               />
             </Stack>
           </Stack>

@@ -50,7 +50,7 @@ type Componente = {
   sesso: 'M' | 'F' | null
   paesi_terzi_ue: boolean
 }
-type Tessera    = { id: string; numero: string; scadenza_nuova: string | null }
+type Iscrizione = { id: string; numero_tessera: string; data_scadenza: string | null }
 type Nucleo = {
   id: string
   numero_nucleo_familiare: string | null
@@ -62,7 +62,7 @@ type Nucleo = {
   archiviato: boolean
   created_at: string
   componenti: Componente[]
-  tessere: Tessera[]
+  iscrizioni: Iscrizione[]
 }
 
 type StatoMenuAnchor = {
@@ -176,7 +176,7 @@ function isCapofamigliaTitolare(componenti: Componente[]) {
 function matchSearch(n: Nucleo, q: string) {
   const low = q.toLowerCase()
   if (getCodiceFiscaleTesserato(n)?.toLowerCase().includes(low)) return true
-  if (n.tessere.some((t) => t.numero.toLowerCase().includes(low))) return true
+  if (n.iscrizioni.some((t) => t.numero_tessera.toLowerCase().includes(low))) return true
   if (n.componenti.some((c) =>
     c.cognome.toLowerCase().includes(low) || c.nome.toLowerCase().includes(low)
   )) return true
@@ -218,7 +218,7 @@ export default function ListaUtenti() {
     setError('')
     const { data, error: err } = await supabase
       .from('nuclei')
-      .select('*, componenti(*), tessere(*)')
+      .select('*, componenti(*), iscrizioni(*)')
       .eq('archiviato', showArchiviati)
       .order('created_at', { ascending: false })
     if (err) setError(err.message)
@@ -249,7 +249,10 @@ export default function ListaUtenti() {
   const totaleFamiglie = nuclei.length
   const attiviCount = nuclei.filter((n) => n.stato === 'verde').length
   const inScadenzaCount = nuclei.filter((n) => {
-    const date = n.tessere[0]?.scadenza_nuova
+    const latestIscr = n.iscrizioni
+      .slice()
+      .sort((a, b) => new Date(b.data_scadenza ?? '').getTime() - new Date(a.data_scadenza ?? '').getTime())[0]
+    const date = latestIscr?.data_scadenza
     if (!date) return false
     const diff = new Date(date).getTime() - Date.now()
     return diff > 0 && diff <= 1000 * 60 * 60 * 48
@@ -410,11 +413,11 @@ export default function ListaUtenti() {
 
     if (tessValues.length > 0) {
       const { data } = await supabase
-        .from('tessere')
-        .select('numero')
-        .in('numero', tessValues)
+        .from('iscrizioni')
+        .select('numero_tessera')
+        .in('numero_tessera', tessValues)
       data?.forEach((row) => {
-        if (row.numero) existingTessere.add(String(row.numero).trim())
+        if (row.numero_tessera) existingTessere.add(String(row.numero_tessera).trim())
       })
     }
 
@@ -490,16 +493,16 @@ export default function ListaUtenti() {
       }
 
       if (tessera) {
-        const { error: tessErr } = await supabase
-          .from('tessere')
+        const { error: iscrErr } = await supabase
+          .from('iscrizioni')
           .insert({
             nucleo_id: createdNucleo.id,
-            numero: tessera,
-            scadenza_nuova: nucleo.tesseraScadenza,
+            numero_tessera: tessera,
+            data_scadenza: nucleo.tesseraScadenza,
           })
 
-        if (tessErr) {
-          dettagli.push(`Nucleo ${capofamiglia.cognome} ${capofamiglia.nome} importato senza tessera: ${tessErr.message}`.trim())
+        if (iscrErr) {
+          dettagli.push(`Nucleo ${capofamiglia.cognome} ${capofamiglia.nome} importato senza tessera: ${iscrErr.message}`.trim())
         }
       }
 
@@ -760,7 +763,10 @@ export default function ListaUtenti() {
               ) : (
                 pagedRows.map((n) => {
                   const nome = getNomePrincipale(n.componenti)
-                  const scadenza = n.tessere[0]?.scadenza_nuova ?? null
+                  const latestIscr = n.iscrizioni
+                    .slice()
+                    .sort((a, b) => new Date(b.data_scadenza ?? '').getTime() - new Date(a.data_scadenza ?? '').getTime())[0]
+                  const scadenza = latestIscr?.data_scadenza ?? null
                   const status = renderInlineStatus(n.stato)
                   const componentiOrdinati = [...n.componenti].sort(sortByOlderFirst)
                   const capoCoincideConTitolare = isCapofamigliaTitolare(n.componenti)
@@ -842,7 +848,7 @@ export default function ListaUtenti() {
                     </TableCell>
                     <TableCell>{getCodiceFiscaleTesserato(n) ?? '—'}</TableCell>
                     <TableCell>{n.zona}</TableCell>
-                    <TableCell>{n.tessere[0]?.numero ?? '—'}</TableCell>
+                    <TableCell>{latestIscr?.numero_tessera ?? '—'}</TableCell>
                     <TableCell sx={{ color: getScadenzaTone(scadenza), fontWeight: 700 }}>
                       {formatDate(scadenza)}
                     </TableCell>

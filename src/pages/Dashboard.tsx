@@ -103,20 +103,21 @@ export default function Dashboard() {
       })
       const zonaData = Object.entries(zonaCounts).map(([name, valore]) => ({ name, valore }))
 
-      // Tessere rinnovate vs non rinnovate
-      const { data: tessRows } = await supabase
-        .from('tessere')
-        .select('rinnovato')
+      // Tessere: iscrizioni valide vs scadute
+      const oggi = new Date().toISOString().slice(0, 10)
+      const { data: iscrRows } = await supabase
+        .from('iscrizioni')
+        .select('data_scadenza')
 
-      let rinnovate = 0
-      let nonRinnovate = 0
-      tessRows?.forEach((t: { rinnovato: boolean }) => {
-        if (t.rinnovato) rinnovate++
-        else nonRinnovate++
+      let valide = 0
+      let scadute = 0
+      iscrRows?.forEach((t: { data_scadenza: string | null }) => {
+        if (t.data_scadenza && t.data_scadenza >= oggi) valide++
+        else scadute++
       })
       const tessData: TesseraRow[] = [
-        { name: 'Rinnovate', valore: rinnovate },
-        { name: 'Non rinnovate', valore: nonRinnovate },
+        { name: 'Valide', valore: valide },
+        { name: 'Scadute', valore: scadute },
       ].filter((r) => r.valore > 0)
 
       setNucleiCount(nCount ?? 0)
@@ -228,7 +229,7 @@ export default function Dashboard() {
           {/* ---- Tessere rinnovate ---- */}
           <Grid item xs={12} md={6}>
             <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>Tessere: rinnovate vs non rinnovate</Typography>
+              <Typography variant="h6" gutterBottom>Tessere: valide vs scadute</Typography>
               <ResponsiveContainer width="100%" height={280}>
                 <PieChart>
                   <Pie

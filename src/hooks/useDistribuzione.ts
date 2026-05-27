@@ -38,10 +38,10 @@ type NucleoRaw = {
     codice_fiscale: string | null
     data_nascita: string | null
   }>
-  tessere: Array<{
+  iscrizioni: Array<{
     id: string
-    numero: string
-    scadenza_nuova: string | null
+    numero_tessera: string
+    data_scadenza: string | null
     created_at: string
   }>
 }
@@ -103,9 +103,9 @@ function areSamePerson(
   return aKey === bKey
 }
 
-function getLatestTessera(tessere: NucleoRaw['tessere']) {
-  if (!tessere.length) return null
-  return tessere
+function getLatestIscrizione(iscrizioni: NucleoRaw['iscrizioni']) {
+  if (!iscrizioni.length) return null
+  return iscrizioni
     .slice()
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
 }
@@ -119,7 +119,7 @@ function mapNucleoToRow(
   const principale = getPrioritizedComponent(nucleo.componenti)
   const capofamiglia = getCapofamigliaComponent(nucleo.componenti)
   const capofamigliaDiverso = Boolean(capofamiglia && principale && !areSamePerson(capofamiglia, principale))
-  const latestTessera = getLatestTessera(nucleo.tessere)
+  const latestIscrizione = getLatestIscrizione(nucleo.iscrizioni)
   const selectedDist = selectedDistribuzioneByNucleo.get(nucleo.id)
 
   return {
@@ -132,8 +132,8 @@ function mapNucleoToRow(
     cognomeCapofamiglia: capofamiglia?.cognome?.trim() ?? null,
     nomeCapofamiglia: capofamiglia?.nome?.trim() ?? null,
     capofamigliaDiverso,
-    numeroTessera: latestTessera?.numero ?? null,
-    scadenzaTessera: latestTessera?.scadenza_nuova ?? null,
+    numeroTessera: latestIscrizione?.numero_tessera ?? null,
+    scadenzaTessera: latestIscrizione?.data_scadenza ?? null,
     giaServitoSettimana: servedThisWeek.has(nucleo.id),
     ultimaDistribuzione: latestByNucleo.get(nucleo.id) ?? null,
     distribuzioneSelezionataId: selectedDist?.id ?? null,
@@ -186,7 +186,7 @@ export function useDistribuzione() {
     const [nucleiResult, distResult] = await Promise.all([
       supabase
         .from('nuclei')
-        .select('id, codice_fiscale, zona, stato, componenti(id, ruolo, nome, cognome, codice_fiscale, data_nascita), tessere(id, numero, scadenza_nuova, created_at)')
+        .select('id, codice_fiscale, zona, stato, componenti(id, ruolo, nome, cognome, codice_fiscale, data_nascita), iscrizioni(id, numero_tessera, data_scadenza, created_at)')
         .eq('archiviato', false)
         .eq('zona', centro),
       supabase

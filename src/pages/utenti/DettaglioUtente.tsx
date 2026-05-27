@@ -3,12 +3,15 @@ import {
   Box, Typography, Button, TextField, MenuItem, Paper, Stack,
   Alert, CircularProgress, Divider, Switch, FormControlLabel, IconButton, Tooltip,
   Dialog, DialogTitle, DialogContent, DialogActions,
+  Table, TableBody, TableCell, TableHead, TableRow,
+  Chip,
 } from '@mui/material'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import SaveIcon from '@mui/icons-material/Save'
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import TableRowsIcon from '@mui/icons-material/TableRows'
+import HistoryIcon from '@mui/icons-material/History'
 import BadgeOutlinedIcon from '@mui/icons-material/BadgeOutlined'
 import Groups2OutlinedIcon from '@mui/icons-material/Groups2Outlined'
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
@@ -246,11 +249,19 @@ export default function DettaglioUtente() {
   const [titolare, setTitolare] = useState<PersonaForm>({ ...PERSONA_VUOTA })
   const [componentiExtra, setComponentiExtra] = useState<PersonaForm[]>([])
 
-  // Stato tessera
-  const [tesseraId, setTesseraId] = useState<string | null>(null)
-  const [tessNumero, setTessNumero] = useState('')
-  const [tessScadVecchia, setTessScadVecchia] = useState('')
-  const [tessScadNuova, setTessScadNuova] = useState('')
+  // Stato iscrizioni tessera
+  type Iscrizione = {
+    id: string
+    numero_tessera: string
+    data_inizio: string | null
+    data_scadenza: string | null
+    note: string | null
+    created_at: string
+  }
+  const [iscrizioni, setIscrizioni] = useState<Iscrizione[]>([])
+  const [storicoOpen, setStoricoOpen] = useState(false)
+  const [nuovaIscrizione, setNuovaIscrizione] = useState({ numero_tessera: '', data_inizio: '', data_scadenza: '', note: '' })
+  const [savingIscrizione, setSavingIscrizione] = useState(false)
 
   // Dialog import Excel
   const [excelOpen, setExcelOpen] = useState(false)
@@ -270,10 +281,11 @@ export default function DettaglioUtente() {
         .select('*')
         .eq('nucleo_id', id)
         .order('created_at')
-      const { data: tess, error: e3 } = await supabase
-        .from('tessere')
-        .select('*')
+      const { data: isc, error: e3 } = await supabase
+        .from('iscrizioni')
+        .select('id, numero_tessera, data_inizio, data_scadenza, note, created_at')
         .eq('nucleo_id', id)
+        .order('created_at', { ascending: false })
 
       if (e1 || e2 || e3) {
         setError('Errore nel caricamento dei dati.')
@@ -344,12 +356,9 @@ export default function DettaglioUtente() {
         }))
       )
 
-      const t = tess?.[0]
-      if (t) {
-        setTesseraId(t.id)
-        setTessNumero(t.numero ?? '')
-        setTessScadVecchia(t.scadenza_vecchia ?? '')
-        setTessScadNuova(t.scadenza_nuova ?? '')
+      setIscrizioni(isc ?? [])
+      if (isc && isc.length > 0) {
+        setNuovaIscrizione((prev) => ({ ...prev, numero_tessera: isc[0].numero_tessera }))
       }
 
       setPageLoading(false)
@@ -461,25 +470,6 @@ export default function DettaglioUtente() {
       return
     }
 
-    // 3. Aggiorna / crea tessera
-    if (tessNumero.trim()) {
-      if (tesseraId) {
-        await supabase.from('tessere').update({
-          numero: tessNumero.trim(),
-          scadenza_vecchia: tessScadVecchia || null,
-          scadenza_nuova: tessScadNuova || null,
-        }).eq('id', tesseraId)
-      } else {
-        const { data: newTess } = await supabase.from('tessere').insert({
-          nucleo_id: id,
-          numero: tessNumero.trim(),
-          scadenza_vecchia: tessScadVecchia || null,
-          scadenza_nuova: tessScadNuova || null,
-        }).select('id').single()
-        if (newTess) setTesseraId(newTess.id)
-      }
-    }
-
     setSaving(false)
     setSuccessMsg('Dati salvati correttamente.')
   }
@@ -496,6 +486,29 @@ export default function DettaglioUtente() {
     }
     setExcelText('')
     setExcelOpen(false)
+  }
+
+  const handleSalvaIscrizione = async () => {
+    if (!nuovaIscrizione.numero_tessera.trim()) return
+    setSavingIscrizione(true)
+    const { data: newIscr, error: iscrErr } = await supabase
+      .from('iscrizioni')
+      .insert({
+        nucleo_id: id,
+        numero_tessera: nuovaIscrizione.numero_tessera.trim(),
+        data_inizio: nuovaIscrizione.data_inizio || null,
+        data_scadenza: nuovaIscrizione.data_scadenza || null,
+        note: nuovaIscrizione.note.trim() || null,
+      })
+      .select('id, numero_tessera, data_inizio, data_scadenza, note, created_at')
+      .single()
+    setSavingIscrizione(false)
+    if (iscrErr || !newIscr) {
+      setError(iscrErr?.message ?? 'Errore salvataggio iscrizione.')
+      return
+    }
+    setIscrizioni((prev) => [newIscr, ...prev])
+    setNuovaIscrizione({ numero_tessera: newIscr.numero_tessera, data_inizio: '', data_scadenza: '', note: '' })
   }
 
   if (pageLoading) {
@@ -594,11 +607,6 @@ export default function DettaglioUtente() {
             </Stack>
             <Stack direction="row" sx={{ gap: 2.2, flexWrap: 'wrap' }}>
               <TextField
-                label="Numero tessera" value={tessNumero}
-                onChange={(e) => setTessNumero(e.target.value)}
-                sx={{ flex: 1, minWidth: 220 }}
-              />
-              <TextField
                 label="Telefono"
                 value={telefono}
                 onChange={(e) => setTelefono(e.target.value)}
@@ -613,27 +621,30 @@ export default function DettaglioUtente() {
             </Stack>
             <Stack direction="row" sx={{ gap: 2.2, flexWrap: 'wrap' }}>
               <TextField
-                label="Scadenza precedente" type="date" value={tessScadVecchia}
-                onChange={(e) => setTessScadVecchia(e.target.value)}
-                slotProps={{ inputLabel: { shrink: true } }}
-                sx={{
-                  flex: 1,
-                  minWidth: 220,
-                  '& input': { fontSize: '0.97rem' },
-                  '& .MuiInputLabel-root': { px: 0.35, bgcolor: 'background.paper' },
-                }}
+                label="Numero tessera"
+                value={iscrizioni[0]?.numero_tessera ?? '—'}
+                slotProps={{ htmlInput: { readOnly: true } }}
+                sx={{ flex: 1, minWidth: 220 }}
               />
               <TextField
-                label="Scadenza nuova" type="date" value={tessScadNuova}
-                onChange={(e) => setTessScadNuova(e.target.value)}
-                slotProps={{ inputLabel: { shrink: true } }}
-                sx={{
-                  flex: 1,
-                  minWidth: 220,
-                  '& input': { fontSize: '0.97rem' },
-                  '& .MuiInputLabel-root': { px: 0.35, bgcolor: 'background.paper' },
-                }}
+                label="Scadenza"
+                value={iscrizioni[0]?.data_scadenza
+                  ? new Date(iscrizioni[0].data_scadenza).toLocaleDateString('it-IT')
+                  : '—'}
+                slotProps={{ htmlInput: { readOnly: true } }}
+                sx={{ flex: 1, minWidth: 220 }}
               />
+              <Button
+                variant="outlined"
+                startIcon={<HistoryIcon />}
+                onClick={() => setStoricoOpen(true)}
+                sx={{ alignSelf: 'center', minWidth: 200, height: 56 }}
+              >
+                Storico iscrizioni
+                {iscrizioni.length > 0 && (
+                  <Chip label={iscrizioni.length} size="small" sx={{ ml: 1 }} />
+                )}
+              </Button>
             </Stack>
           </Stack>
           </Box>
@@ -732,6 +743,89 @@ export default function DettaglioUtente() {
         </Paper>
 
       </Stack>
+
+      {/* Dialog storico iscrizioni */}
+      <Dialog open={storicoOpen} onClose={() => setStoricoOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <HistoryIcon color="success" />
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>Storico Iscrizioni</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {/* Tabella storico */}
+          {iscrizioni.length === 0 ? (
+            <Typography color="text.secondary" sx={{ mb: 3 }}>Nessuna iscrizione registrata.</Typography>
+          ) : (
+            <Table size="small" sx={{ mb: 3 }}>
+              <TableHead>
+                <TableRow sx={{ bgcolor: 'grey.50' }}>
+                  {['N. Tessera', 'Data inizio', 'Scadenza', 'Note', 'Registrata il'].map((h) => (
+                    <TableCell key={h} sx={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, color: 'text.secondary' }}>{h}</TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {iscrizioni.map((isc, i) => (
+                  <TableRow key={isc.id} sx={i === 0 ? { bgcolor: 'rgba(26,110,60,0.06)' } : {}}>
+                    <TableCell sx={{ fontWeight: i === 0 ? 700 : 400 }}>{isc.numero_tessera}</TableCell>
+                    <TableCell>{isc.data_inizio ? new Date(isc.data_inizio).toLocaleDateString('it-IT') : '—'}</TableCell>
+                    <TableCell sx={{ fontWeight: i === 0 ? 700 : 400, color: i === 0 ? 'success.dark' : 'text.primary' }}>
+                      {isc.data_scadenza ? new Date(isc.data_scadenza).toLocaleDateString('it-IT') : '—'}
+                    </TableCell>
+                    <TableCell>{isc.note ?? '—'}</TableCell>
+                    <TableCell sx={{ color: 'text.secondary', fontSize: '0.8rem' }}>
+                      {new Date(isc.created_at).toLocaleDateString('it-IT')}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+
+          <Divider sx={{ mb: 2.5 }} />
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>Aggiungi rinnovo</Typography>
+          <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ gap: 2, flexWrap: 'wrap' }}>
+            <TextField
+              label="Numero tessera" required
+              value={nuovaIscrizione.numero_tessera}
+              onChange={(e) => setNuovaIscrizione((p) => ({ ...p, numero_tessera: e.target.value }))}
+              sx={{ flex: 1, minWidth: 180 }}
+            />
+            <TextField
+              label="Data inizio" type="date"
+              value={nuovaIscrizione.data_inizio}
+              onChange={(e) => setNuovaIscrizione((p) => ({ ...p, data_inizio: e.target.value }))}
+              slotProps={{ inputLabel: { shrink: true } }}
+              sx={{ flex: 1, minWidth: 180 }}
+            />
+            <TextField
+              label="Scadenza" type="date"
+              value={nuovaIscrizione.data_scadenza}
+              onChange={(e) => setNuovaIscrizione((p) => ({ ...p, data_scadenza: e.target.value }))}
+              slotProps={{ inputLabel: { shrink: true } }}
+              sx={{ flex: 1, minWidth: 180 }}
+            />
+            <TextField
+              label="Note"
+              value={nuovaIscrizione.note}
+              onChange={(e) => setNuovaIscrizione((p) => ({ ...p, note: e.target.value }))}
+              sx={{ flex: 2, minWidth: 200 }}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setStoricoOpen(false)}>Chiudi</Button>
+          <Button
+            variant="contained"
+            startIcon={savingIscrizione ? <CircularProgress size={16} color="inherit" /> : <AddIcon />}
+            disabled={savingIscrizione || !nuovaIscrizione.numero_tessera.trim()}
+            onClick={handleSalvaIscrizione}
+          >
+            Salva rinnovo
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Dialog import Excel */}
       <Dialog open={excelOpen} onClose={() => setExcelOpen(false)} maxWidth="md" fullWidth>

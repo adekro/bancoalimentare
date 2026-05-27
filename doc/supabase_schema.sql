@@ -108,16 +108,43 @@ DO $$ BEGIN
     ADD CONSTRAINT componenti_sesso_check CHECK (sesso IN ('M', 'F'));
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
--- Tessere
-CREATE TABLE IF NOT EXISTS public.tessere (
+-- Storico iscrizioni / tessere (un record per ogni periodo di iscrizione)
+CREATE TABLE IF NOT EXISTS public.iscrizioni (
     id               UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
     nucleo_id        UUID        NOT NULL REFERENCES public.nuclei(id) ON DELETE CASCADE,
-    numero           TEXT        NOT NULL,
-    scadenza_vecchia DATE,
-    scadenza_nuova   DATE,
-    rinnovato        BOOLEAN     NOT NULL DEFAULT FALSE,
+    numero_tessera   TEXT        NOT NULL,
+    data_inizio      DATE,
+    data_scadenza    DATE,
+    note             TEXT,
+    operatore_id     UUID        REFERENCES auth.users(id) ON DELETE SET NULL,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Migrazione dati da tessere (se la tabella esiste ancora)
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'tessere') THEN
+        -- Riga per scadenza_vecchia (iscrizione precedente)
+        INSERT INTO public.iscrizioni (nucleo_id, numero_tessera, data_scadenza, created_at)
+        SELECT nucleo_id, numero, scadenza_vecchia,
+               created_at - INTERVAL '1 second'
+        FROM public.tessere
+        WHERE scadenza_vecchia IS NOT NULL
+        ON CONFLICT DO NOTHING;
+        -- Riga per scadenza_nuova (iscrizione corrente)
+        INSERT INTO public.iscrizioni (nucleo_id, numero_tessera, data_scadenza, created_at)
+        SELECT nucleo_id, numero, scadenza_nuova, created_at
+        FROM public.tessere
+        WHERE scadenza_nuova IS NOT NULL
+        ON CONFLICT DO NOTHING;
+        -- Nuclei con tessera ma senza date: solo numero
+        INSERT INTO public.iscrizioni (nucleo_id, numero_tessera, created_at)
+        SELECT nucleo_id, numero, created_at
+        FROM public.tessere
+        WHERE scadenza_vecchia IS NULL AND scadenza_nuova IS NULL
+        ON CONFLICT DO NOTHING;
+        DROP TABLE public.tessere;
+    END IF;
+END $$;
 
 -- Distribuzioni effettuate
 CREATE TABLE IF NOT EXISTS public.distribuzioni (
@@ -163,9 +190,9 @@ CREATE INDEX IF NOT EXISTS idx_componenti_nucleo     ON public.componenti(nucleo
 CREATE INDEX IF NOT EXISTS idx_componenti_cognome    ON public.componenti(cognome);
 CREATE INDEX IF NOT EXISTS idx_componenti_codice_fiscale ON public.componenti(codice_fiscale);
 
-CREATE INDEX IF NOT EXISTS idx_tessere_nucleo        ON public.tessere(nucleo_id);
-CREATE INDEX IF NOT EXISTS idx_tessere_numero        ON public.tessere(numero);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_tessere_numero  ON public.tessere(numero);
+CREATE INDEX IF NOT EXISTS idx_iscrizioni_nucleo       ON public.iscrizioni(nucleo_id);
+CREATE INDEX IF NOT EXISTS idx_iscrizioni_data_scad    ON public.iscrizioni(data_scadenza);
+CREATE INDEX IF NOT EXISTS idx_iscrizioni_numero       ON public.iscrizioni(numero_tessera);
 
 CREATE INDEX IF NOT EXISTS idx_distribuzioni_nucleo  ON public.distribuzioni(nucleo_id);
 CREATE INDEX IF NOT EXISTS idx_distribuzioni_data    ON public.distribuzioni(data);
@@ -282,7 +309,7 @@ $$;
 ALTER TABLE public.access_requests     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.nuclei               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.componenti           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.tessere              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.iscrizioni           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.distribuzioni        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.articoli             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.movimenti_magazzino  ENABLE ROW LEVEL SECURITY;
@@ -304,10 +331,10 @@ DROP POLICY IF EXISTS "componenti: modifica per autenticati" ON public.component
 DROP POLICY IF EXISTS "componenti: eliminazione solo admin" ON public.componenti;
 DROP POLICY IF EXISTS "componenti: eliminazione per autenticati" ON public.componenti;
 
-DROP POLICY IF EXISTS "tessere: lettura per autenticati" ON public.tessere;
-DROP POLICY IF EXISTS "tessere: inserimento per autenticati" ON public.tessere;
-DROP POLICY IF EXISTS "tessere: modifica per autenticati" ON public.tessere;
-DROP POLICY IF EXISTS "tessere: eliminazione solo admin" ON public.tessere;
+DROP POLICY IF EXISTS "iscrizioni: lettura per autenticati" ON public.iscrizioni;
+DROP POLICY IF EXISTS "iscrizioni: inserimento per autenticati" ON public.iscrizioni;
+DROP POLICY IF EXISTS "iscrizioni: modifica solo admin" ON public.iscrizioni;
+DROP POLICY IF EXISTS "iscrizioni: eliminazione solo admin" ON public.iscrizioni;
 
 DROP POLICY IF EXISTS "distribuzioni: lettura per autenticati" ON public.distribuzioni;
 DROP POLICY IF EXISTS "distribuzioni: inserimento per autenticati" ON public.distribuzioni;
@@ -382,22 +409,23 @@ CREATE POLICY "componenti: eliminazione per autenticati"
     ON public.componenti FOR DELETE
     USING (auth.role() = 'authenticated');
 
--- ── tessere ──────────────────────────────────────────────────
-CREATE POLICY "tessere: lettura per autenticati"
-    ON public.tessere FOR SELECT
+-- ── iscrizioni ─────────────────────────────────────────────
+CREATE POLICY "iscrizioni: lettura per autenticati"
+    ON public.iscrizioni FOR SELECT
     USING (auth.role() = 'authenticated');
 
-CREATE POLICY "tessere: inserimento per autenticati"
-    ON public.tessere FOR INSERT
+CREATE POLICY "iscrizioni: inserimento per autenticati"
+    ON public.iscrizioni FOR INSERT
     WITH CHECK (auth.role() = 'authenticated');
 
-CREATE POLICY "tessere: modifica per autenticati"
-    ON public.tessere FOR UPDATE
-    USING (auth.role() = 'authenticated')
-    WITH CHECK (auth.role() = 'authenticated');
+-- Le iscrizioni sono append-only; solo admin può correggere o eliminare
+CREATE POLICY "iscrizioni: modifica solo admin"
+    ON public.iscrizioni FOR UPDATE
+    USING (public.fn_is_admin())
+    WITH CHECK (public.fn_is_admin());
 
-CREATE POLICY "tessere: eliminazione solo admin"
-    ON public.tessere FOR DELETE
+CREATE POLICY "iscrizioni: eliminazione solo admin"
+    ON public.iscrizioni FOR DELETE
     USING (public.fn_is_admin());
 
 -- ── distribuzioni ────────────────────────────────────────────
@@ -476,7 +504,7 @@ GRANT USAGE  ON SCHEMA public TO authenticated;
 GRANT ALL    ON public.access_requests    TO authenticated;
 GRANT ALL    ON public.nuclei             TO authenticated;
 GRANT ALL    ON public.componenti         TO authenticated;
-GRANT ALL    ON public.tessere            TO authenticated;
+GRANT ALL    ON public.iscrizioni         TO authenticated;
 GRANT ALL    ON public.distribuzioni      TO authenticated;
 GRANT ALL    ON public.articoli           TO authenticated;
 GRANT ALL    ON public.movimenti_magazzino TO authenticated;
