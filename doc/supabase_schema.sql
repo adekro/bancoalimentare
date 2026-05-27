@@ -85,8 +85,10 @@ CREATE TABLE IF NOT EXISTS public.componenti (
     codice_fiscale TEXT,
     data_nascita DATE,
     nazionalita  TEXT,
+    nazione_nascita TEXT,
     sesso        TEXT CHECK (sesso IN ('M', 'F')),
     paesi_terzi_ue BOOLEAN          NOT NULL DEFAULT FALSE,
+    invalido     BOOLEAN            NOT NULL DEFAULT FALSE,
     fascia_eta   fascia_eta,                    -- calcolata automaticamente da data_nascita
     created_at   TIMESTAMPTZ        NOT NULL DEFAULT NOW()
 );
@@ -99,6 +101,8 @@ ALTER TABLE public.nuclei ADD COLUMN IF NOT EXISTS indirizzo TEXT;
 ALTER TABLE public.componenti ADD COLUMN IF NOT EXISTS sesso TEXT;
 ALTER TABLE public.componenti ADD COLUMN IF NOT EXISTS paesi_terzi_ue BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE public.componenti ADD COLUMN IF NOT EXISTS codice_fiscale TEXT;
+ALTER TABLE public.componenti ADD COLUMN IF NOT EXISTS nazione_nascita TEXT;
+ALTER TABLE public.componenti ADD COLUMN IF NOT EXISTS invalido BOOLEAN NOT NULL DEFAULT FALSE;
 DO $$ BEGIN
     ALTER TABLE public.componenti
     ADD CONSTRAINT componenti_sesso_check CHECK (sesso IN ('M', 'F'));

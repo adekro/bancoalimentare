@@ -471,9 +471,11 @@ export default function ListaUtenti() {
           cognome: p.cognome,
           codice_fiscale: p.isTesserato ? (cf || null) : null,
           data_nascita: p.dataNascita,
+          nazione_nascita: p.nazioneNascita,
           nazionalita: p.nazionalita,
           sesso: p.sesso,
           paesi_terzi_ue: p.paesiTerziUe,
+          invalido: p.invalido,
           fascia_eta: calcFascia(p.dataNascita),
         }))
 

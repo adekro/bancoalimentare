@@ -4,9 +4,11 @@ export type ImportPerson = {
   cognome: string
   nome: string
   dataNascita: string | null
+  nazioneNascita: string | null
   nazionalita: string | null
   sesso: 'M' | 'F' | null
   paesiTerziUe: boolean
+  invalido: boolean
   isCapofamiglia: boolean
   isTesserato: boolean
 }
@@ -15,6 +17,7 @@ export type ImportNucleo = {
   sourceRowStart: number
   sourceRowEnd: number
   numeroNucleoFamiliare: string | null
+  gruppoFamigliare: string | null
   zona: string | null
   codiceFiscale: string | null
   telefono: string | null
@@ -41,14 +44,19 @@ type HeaderMap = {
   cognome: number
   nome: number
   nazNascita: number
+  nazionalita: number
   sesso: number
   paesiTerziUe: number
+  ue: number
   data: number
   tess: number
+  nrComp: number
   scad: number
+  inv: number
   telefono: number
   indirizzo: number
   codFisc: number
+  gruppoFamigliare: number
 }
 
 const DEFAULT_HEADER_MAP: HeaderMap = {
@@ -57,14 +65,19 @@ const DEFAULT_HEADER_MAP: HeaderMap = {
   cognome: -1,
   nome: -1,
   nazNascita: -1,
+  nazionalita: -1,
   sesso: -1,
   paesiTerziUe: -1,
+  ue: -1,
   data: -1,
   tess: -1,
+  nrComp: -1,
   scad: -1,
+  inv: -1,
   telefono: -1,
   indirizzo: -1,
   codFisc: -1,
+  gruppoFamigliare: -1,
 }
 
 const ZONA_BY_GR: Record<string, string> = {
@@ -94,21 +107,43 @@ function findHeaderMap(rows: unknown[][]): { rowIndex: number; map: HeaderMap } 
     const map: HeaderMap = { ...DEFAULT_HEADER_MAP }
 
     normalized.forEach((cell, idx) => {
-      if (cell === 'NR' || cell === 'N R') map.nr = idx
-      if (cell === 'GR' || cell === 'GRUPPO') map.gr = idx
+      // Numero fascicolo FEAD / capofamiglia
+      if (cell === 'NR' || cell === 'N R' || cell.startsWith('NR FASC')) map.nr = idx
+      // Zona (Duomo, San Rocco, …)
+      if (cell === 'GR' || cell === 'GR ' || cell === 'GRUPPO') map.gr = idx
       if (cell.includes('COGNOME')) map.cognome = idx
       if (cell === 'NOME' || cell.startsWith('NOME ')) map.nome = idx
-      if (cell.includes('NAZ NASCITA') || cell.includes('NAZIONALITA')) map.nazNascita = idx
-      if (cell === 'SESSO' || cell === 'SEX') map.sesso = idx
-      if (cell.includes('PAESI TERZI UE') || cell.includes('EXTRA UE') || cell.includes('NON UE')) {
+      // Paese di nascita (NAZ. NASCITA)
+      if (cell === 'NAZ NASCITA' || cell.startsWith('NAZ NASCITA')) map.nazNascita = idx
+      // Cittadinanza effettiva (NAZIONALITA — colonna separata nel formato 2026)
+      if (cell === 'NAZIONALITA') map.nazionalita = idx
+      // Sesso: colonna M/F nel formato 2026, oppure SESSO/SEX nel vecchio
+      if (cell === 'M F' || cell === 'SESSO' || cell === 'SEX') map.sesso = idx
+      // Extra-UE: "PAESI TERZI" (2026) o varianti precedenti
+      if (
+        cell === 'PAESI TERZI' ||
+        cell.includes('PAESI TERZI UE') ||
+        cell.includes('EXTRA UE') ||
+        cell.includes('NON UE')
+      ) {
         map.paesiTerziUe = idx
       }
+      // UE flag (letto ma non persistito separatamente)
+      if (cell === 'UE') map.ue = idx
       if (cell === 'DATA' || cell.includes('DATA NASCITA')) map.data = idx
-      if (cell.startsWith('TESS')) map.tess = idx
-      if (cell.startsWith('SCAD')) map.scad = idx
+      // Tessera: "TESS." (2026) o "TESS" (vecchio)
+      if (cell === 'TESS' || cell.startsWith('TESS')) map.tess = idx
+      // Numero componenti sotto la tessera
+      if (cell === 'NR COMP' || cell.startsWith('NR COMP')) map.nrComp = idx
+      // Scadenza tessera: "SCAD. TESS." (2026) o "SCAD" (vecchio)
+      if (cell === 'SCAD' || cell.startsWith('SCAD')) map.scad = idx
+      // Invalido
+      if (cell === 'INV') map.inv = idx
       if (cell.startsWith('TELEFONO') || cell === 'TEL') map.telefono = idx
       if (cell.startsWith('INDIRIZZO')) map.indirizzo = idx
       if (cell.includes('COD FISC')) map.codFisc = idx
+      // Gruppo famigliare (delimitatore gruppi nel formato 2026)
+      if (cell === 'GRUPPO FAMIGLIARE' || cell.startsWith('GRUPPO FAMIGLIARE')) map.gruppoFamigliare = idx
     })
 
     if (map.cognome >= 0 && map.nome >= 0) {
@@ -278,20 +313,29 @@ function applyRoleFallbacks(nucleo: ImportNucleo): void {
   }
 }
 
-function buildNucleoFromRow(row: unknown[], map: HeaderMap, excelRow: number): ImportNucleo {
+function buildEmptyNucleo(gruppoFamigliare: string | null, firstRow: number): ImportNucleo {
   return {
-    sourceRowStart: excelRow,
-    sourceRowEnd: excelRow,
-    numeroNucleoFamiliare: asTrimmedString(getCell(row, map.nr)) || null,
-    zona: parseZonaFromGr(getCell(row, map.gr)),
-    codiceFiscale: normalizeCodiceFiscale(getCell(row, map.codFisc)),
-    telefono: asTrimmedString(getCell(row, map.telefono)) || null,
-    indirizzo: asTrimmedString(getCell(row, map.indirizzo)) || null,
-    tesseraNumero: normalizeTessera(getCell(row, map.tess)),
-    tesseraScadenza: normalizeDate(getCell(row, map.scad)),
+    sourceRowStart: firstRow,
+    sourceRowEnd: firstRow,
+    numeroNucleoFamiliare: null,
+    gruppoFamigliare,
+    zona: null,
+    codiceFiscale: null,
+    telefono: null,
+    indirizzo: null,
+    tesseraNumero: null,
+    tesseraScadenza: null,
     persone: [],
     validationErrors: [],
   }
+}
+
+function parseGruppoFamigliareVal(value: unknown): string | null {
+  const raw = asTrimmedString(value).replace(',', '.').trim()
+  if (!raw) return null
+  const num = parseFloat(raw)
+  if (!Number.isFinite(num)) return null
+  return String(Math.round(num))
 }
 
 export async function parseNucleiFromExcel(file: File): Promise<ParseNucleiResult> {
@@ -326,45 +370,69 @@ export async function parseNucleiFromExcel(file: File): Promise<ParseNucleiResul
   const issues: ImportIssue[] = []
 
   let current: ImportNucleo | null = null
+  // Valore normalizzato dell'ultima riga "gruppo famigliare" elaborata
+  let currentGruppoVal: string | null = null
+  // true se la colonna gruppo famigliare è presente nell'intestazione
+  const hasGruppoCol = map.gruppoFamigliare >= 0
 
   for (let i = headerRowIndex + 1; i < rows.length; i++) {
     const row = rows[i]
     const excelRow = i + 1
-    const lead = isLeadRow(row, map)
-
-    if (lead) {
-      if (!current) {
-        current = buildNucleoFromRow(row, map, excelRow)
-      } else if (current.persone.length > 0) {
-        applyRoleFallbacks(current)
-        current.validationErrors = validateNucleo(current)
-        nuclei.push(current)
-        current = buildNucleoFromRow(row, map, excelRow)
-      } else {
-        current = buildNucleoFromRow(row, map, excelRow)
-      }
-    }
 
     const cognomeCell = getCell(row, map.cognome)
     const nomeCell = getCell(row, map.nome)
-    if (!isPersonRow(cognomeCell, nomeCell)) continue
+    const isPersona = isPersonRow(cognomeCell, nomeCell)
 
-    if (!current) {
-      current = buildNucleoFromRow(row, map, excelRow)
+    if (hasGruppoCol) {
+      // ── Formato 2026: delimitazione tramite colonna "gruppo famigliare" ──
+      const gruppoVal = parseGruppoFamigliareVal(getCell(row, map.gruppoFamigliare))
+      if (gruppoVal && gruppoVal !== currentGruppoVal) {
+        // Nuovo gruppo: finalizza quello precedente (se presente e non vuoto)
+        if (current && current.persone.length > 0) {
+          applyRoleFallbacks(current)
+          current.validationErrors = validateNucleo(current)
+          nuclei.push(current)
+        }
+        current = buildEmptyNucleo(gruppoVal, excelRow)
+        currentGruppoVal = gruppoVal
+      }
+    } else {
+      // ── Formato legacy: delimitazione tramite lead row ──
+      const lead = isLeadRow(row, map)
+      if (lead) {
+        if (!current) {
+          current = buildEmptyNucleo(null, excelRow)
+        } else if (current.persone.length > 0) {
+          applyRoleFallbacks(current)
+          current.validationErrors = validateNucleo(current)
+          nuclei.push(current)
+          current = buildEmptyNucleo(null, excelRow)
+        } else {
+          current = buildEmptyNucleo(null, excelRow)
+        }
+      }
     }
 
-    if (!current) continue
+    if (!isPersona) continue
+
+    if (!current) {
+      current = buildEmptyNucleo(currentGruppoVal, excelRow)
+    }
 
     const isCapofamigliaOnRow = Boolean(asTrimmedString(getCell(row, map.nr)))
-    const isTesseratoOnRow = Boolean(asTrimmedString(getCell(row, map.tess)))
+    const isTesseratoOnRow = Boolean(normalizeTessera(getCell(row, map.tess)))
 
     const persona: ImportPerson = {
       cognome: asTrimmedString(cognomeCell),
       nome: asTrimmedString(nomeCell),
       dataNascita: normalizeDate(getCell(row, map.data)),
-      nazionalita: asTrimmedString(getCell(row, map.nazNascita)) || null,
+      nazioneNascita: asTrimmedString(getCell(row, map.nazNascita)) || null,
+      nazionalita: map.nazionalita >= 0
+        ? (asTrimmedString(getCell(row, map.nazionalita)) || null)
+        : (asTrimmedString(getCell(row, map.nazNascita)) || null),
       sesso: normalizeSesso(getCell(row, map.sesso)),
       paesiTerziUe: normalizePaesiTerziUe(getCell(row, map.paesiTerziUe)),
+      invalido: normalizePaesiTerziUe(getCell(row, map.inv)),
       isCapofamiglia: isCapofamigliaOnRow,
       isTesserato: isTesseratoOnRow,
     }
