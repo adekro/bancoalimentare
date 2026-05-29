@@ -23,6 +23,7 @@ export type DistribuzioneRow = {
   distribuzioneSelezionataId: string | null
   notaDistribuzione: string | null
   haNotaDistribuzione: boolean
+  numeroPacchi: number | null
 }
 
 type NucleoRaw = {
@@ -51,6 +52,7 @@ type DistribuzioneRaw = {
   nucleo_id: string
   data: string
   note: string | null
+  numero_pacchi: number | null
   created_at: string
 }
 
@@ -139,6 +141,7 @@ function mapNucleoToRow(
     distribuzioneSelezionataId: selectedDist?.id ?? null,
     notaDistribuzione: selectedDist?.note ?? null,
     haNotaDistribuzione: Boolean(selectedDist?.note),
+    numeroPacchi: selectedDist?.numero_pacchi ?? null,
   } as DistribuzioneRow
 }
 
@@ -192,7 +195,7 @@ export function useDistribuzione() {
         .eq('zona', centro),
       supabase
         .from('distribuzioni')
-        .select('id, nucleo_id, data, note, created_at')
+        .select('id, nucleo_id, data, note, numero_pacchi, created_at')
         .eq('centro', centro),
     ])
 
@@ -244,7 +247,7 @@ export function useDistribuzione() {
   }, [centro, dataDistribuzione])
 
   const registerConsegna = useCallback(
-    async (nucleoId: string, operatoreId: string | undefined | null) => {
+    async (nucleoId: string, operatoreId: string | undefined | null, numeroPacchi?: number | null) => {
       if (!centro) return { ok: false as const, message: 'Seleziona prima il centro.' }
       if (!operatoreId) return { ok: false as const, message: 'Sessione non valida: operatore non disponibile.' }
 
@@ -264,8 +267,9 @@ export function useDistribuzione() {
           centro,
           data: dataDistribuzione,
           operatore_id: operatoreId,
+          numero_pacchi: numeroPacchi ?? null,
         })
-        .select('id, nucleo_id, data, note')
+        .select('id, nucleo_id, data, note, numero_pacchi')
         .single()
 
       setSavingId(null)
@@ -283,9 +287,10 @@ export function useDistribuzione() {
               ...item,
               giaServitoSettimana: true,
               ultimaDistribuzione: rowDate,
-                distribuzioneSelezionataId: data.id as string,
-                notaDistribuzione: (data.note as string | null) ?? null,
-                haNotaDistribuzione: Boolean(data.note),
+              distribuzioneSelezionataId: data.id as string,
+              notaDistribuzione: (data.note as string | null) ?? null,
+              haNotaDistribuzione: Boolean(data.note),
+              numeroPacchi: (data.numero_pacchi as number | null) ?? null,
             }
             : item,
         ),

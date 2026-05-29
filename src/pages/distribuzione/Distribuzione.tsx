@@ -102,6 +102,7 @@ export default function Distribuzione() {
   } = useDistribuzione()
 
   const [successMsg, setSuccessMsg] = useState('')
+  const [numeroPacchiMap, setNumeroPacchiMap] = useState<Record<string, string>>({})
   const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null)
   const [notaDialog, setNotaDialog] = useState<NotaDialogState | null>(null)
   const [sbloccoDialog, setSbloccoDialog] = useState<SbloccoDialogState | null>(null)
@@ -122,11 +123,19 @@ export default function Distribuzione() {
   }, [])
 
   const handleRegister = async (nucleoId: string) => {
-    const result = await registerConsegna(nucleoId, user?.id)
+    const numeroPacchiStr = numeroPacchiMap[nucleoId] ?? ''
+    const numeroPacchi = numeroPacchiStr !== '' ? parseInt(numeroPacchiStr, 10) : null
+    const result = await registerConsegna(nucleoId, user?.id, numeroPacchi)
     if (!result.ok) {
       setError(result.message)
       return
     }
+
+    setNumeroPacchiMap((prev) => {
+      const next = { ...prev }
+      delete next[nucleoId]
+      return next
+    })
 
     setSuccessMsg('Consegna registrata. Puoi annullare entro 5 secondi.')
     setPendingUndo({
@@ -330,6 +339,7 @@ export default function Distribuzione() {
               <TableCell>Tessera</TableCell>
               <TableCell>Stato</TableCell>
               <TableCell>Ultima distribuzione</TableCell>
+              <TableCell sx={{ width: 90 }}>Pacchi</TableCell>
               <TableCell align="center">Nota / Storico</TableCell>
               <TableCell align="right">Azione</TableCell>
             </TableRow>
@@ -337,7 +347,7 @@ export default function Distribuzione() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7}>
+                <TableCell colSpan={8}>
                   <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
                     <CircularProgress size={26} />
                   </Box>
@@ -345,7 +355,7 @@ export default function Distribuzione() {
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7}>
+                <TableCell colSpan={8}>
                   <Typography color="text.secondary" sx={{ py: 1 }}>
                     {centro
                       ? 'Nessun nucleo trovato con i filtri selezionati.'
@@ -399,6 +409,25 @@ export default function Distribuzione() {
                         <Typography variant="body2" color="text.secondary">
                           {formatDate(row.ultimaDistribuzione)}
                         </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {row.giaServitoSettimana ? (
+                        <Typography variant="body2" sx={{ fontWeight: 700, textAlign: 'center' }}>
+                          {row.numeroPacchi != null ? row.numeroPacchi : '—'}
+                        </Typography>
+                      ) : (
+                        <TextField
+                          type="number"
+                          size="small"
+                          value={numeroPacchiMap[row.nucleoId] ?? ''}
+                          onChange={(e) =>
+                            setNumeroPacchiMap((prev) => ({ ...prev, [row.nucleoId]: e.target.value }))
+                          }
+                          slotProps={{ htmlInput: { min: 0 } }}
+                          sx={{ width: 80 }}
+                          disabled={isSaving}
+                        />
                       )}
                     </TableCell>
                     <TableCell align="center">
@@ -546,6 +575,7 @@ export default function Distribuzione() {
         nucleoId={storicoDistNucleoId?.id ?? null}
         nucleoLabel={storicoDistNucleoId?.label}
         onClose={() => setStoricoDistNucleoId(null)}
+        onChanged={() => load()}
       />
 
       <Dialog

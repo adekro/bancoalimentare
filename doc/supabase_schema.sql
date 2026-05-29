@@ -159,8 +159,12 @@ CREATE TABLE IF NOT EXISTS public.distribuzioni (
     data         DATE               NOT NULL DEFAULT CURRENT_DATE,
     operatore_id UUID               REFERENCES auth.users(id) ON DELETE SET NULL,
     note         TEXT,
+    numero_pacchi INTEGER,
     created_at   TIMESTAMPTZ        NOT NULL DEFAULT NOW()
 );
+
+-- Migrazione: aggiunge numero_pacchi se non presente (per database esistenti)
+ALTER TABLE public.distribuzioni ADD COLUMN IF NOT EXISTS numero_pacchi INTEGER;
 
 -- Articoli del magazzino
 CREATE TABLE IF NOT EXISTS public.articoli (
