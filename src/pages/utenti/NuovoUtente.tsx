@@ -12,8 +12,15 @@ import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/api/supabase'
 import NationalityAutocomplete from '@/components/common/NationalityAutocomplete'
+import type { StatoNucleo } from '@/components/common/StatusChip'
 
 const ZONE = ['Pombio', 'Duomo', 'Medassino', 'San Rocco']
+const STATI: { value: StatoNucleo; label: string }[] = [
+  { value: 'bozza', label: 'Bozza' },
+  { value: 'verde', label: 'Attivo' },
+  { value: 'nero',  label: 'Non rinnovato' },
+  { value: 'rosso', label: 'Sospeso' },
+]
 
 type PersonaForm = {
   nome: string
@@ -141,6 +148,7 @@ export default function NuovoUtente() {
   const [capofamiglia, setCapofamiglia] = useState<PersonaForm>({ ...PERSONA_VUOTA })
   const [titolare, setTitolare] = useState<PersonaForm>({ ...PERSONA_VUOTA })
   const [componentiExtra, setComponentiExtra] = useState<PersonaForm[]>([])
+  const [stato, setStato] = useState<StatoNucleo>('bozza')
   const [tessNumero, setTessNumero] = useState('')
   const [tessDataScadenza, setTessDataScadenza] = useState('')
   const [loading, setLoading] = useState(false)
@@ -178,7 +186,7 @@ export default function NuovoUtente() {
         telefono: telefono.trim() || null,
         indirizzo: indirizzo.trim() || null,
         zona,
-        stato: 'verde',
+        stato,
         archiviato: false,
       })
       .select('id')
@@ -368,6 +376,17 @@ export default function NuovoUtente() {
                 onChange={(e) => setTelefono(e.target.value)}
                 sx={{ flex: 1, minWidth: { md: 220 } }}
               />
+              <TextField
+                select
+                label="Stato"
+                value={stato}
+                onChange={(e) => setStato(e.target.value as StatoNucleo)}
+                sx={{ flex: 1, minWidth: { md: 180 } }}
+              >
+                {STATI.map((s) => (
+                  <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>
+                ))}
+              </TextField>
             </Stack>
           </Stack>
           </Box>
