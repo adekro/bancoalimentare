@@ -24,6 +24,7 @@ import StoricoDistribuzioniDialog from '@/components/common/StoricoDistribuzioni
 
 const ZONE = ['Pombio', 'Duomo', 'Medassino', 'San Rocco']
 const STATI: { value: StatoNucleo; label: string }[] = [
+  { value: 'bozza', label: 'Bozza' },
   { value: 'verde', label: 'Attivo' },
   { value: 'nero',  label: 'Non rinnovato' },
   { value: 'rosso', label: 'Sospeso' },

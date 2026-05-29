@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { supabase } from '@/api/supabase'
 
 export type ZonaDistribuzione = 'Pombio' | 'Duomo' | 'Medassino' | 'San Rocco'
-export type StatoNucleo = 'verde' | 'nero' | 'rosso'
+export type StatoNucleo = 'verde' | 'nero' | 'rosso' | 'bozza'
 
 export const ZONE_DISTRIBUZIONE: ZonaDistribuzione[] = ['Pombio', 'Duomo', 'Medassino', 'San Rocco']
 
@@ -188,6 +188,7 @@ export function useDistribuzione() {
         .from('nuclei')
         .select('id, codice_fiscale, zona, stato, componenti(id, ruolo, nome, cognome, codice_fiscale, data_nascita), iscrizioni(id, numero_tessera, data_scadenza, created_at)')
         .eq('archiviato', false)
+        .neq('stato', 'bozza')
         .eq('zona', centro),
       supabase
         .from('distribuzioni')

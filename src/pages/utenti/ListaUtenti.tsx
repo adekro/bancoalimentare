@@ -33,6 +33,7 @@ import { parseNucleiFromExcel, type ImportNucleo } from '@/utils/nucleiExcelImpo
 const ZONE_FILTER = ['Tutte', 'Pombio', 'Duomo', 'Medassino', 'San Rocco']
 const STATO_FILTER = [
   { value: '', label: 'Tutti' },
+  { value: 'bozza', label: 'Bozza' },
   { value: 'verde', label: 'Attivo' },
   { value: 'nero',  label: 'Non rinnovati' },
   { value: 'rosso', label: 'Sospesi' },
@@ -127,6 +128,9 @@ function getScadenzaTone(value: string | null | undefined) {
 }
 
 function renderInlineStatus(stato: StatoNucleo) {
+  if (stato === 'bozza') {
+    return { label: 'Bozza', color: '#7a5f00' }
+  }
   if (stato === 'verde') {
     return { label: 'Attivo', color: '#1a6e3c' }
   }

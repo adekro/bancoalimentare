@@ -20,8 +20,13 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- ENUM TYPES
 -- ============================================================
 DO $$ BEGIN
-    CREATE TYPE stato_nucleo      AS ENUM ('verde', 'nero', 'rosso');
+    CREATE TYPE stato_nucleo      AS ENUM ('bozza', 'verde', 'nero', 'rosso');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Migrazione: aggiunge 'bozza' a stato_nucleo se non presente (per database esistenti)
+DO $$ BEGIN
+    ALTER TYPE stato_nucleo ADD VALUE IF NOT EXISTS 'bozza' BEFORE 'verde';
+EXCEPTION WHEN others THEN NULL; END $$;
 
 DO $$ BEGIN
     CREATE TYPE ruolo_componente  AS ENUM ('capofamiglia', 'titolare', 'componente');

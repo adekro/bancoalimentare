@@ -1,8 +1,9 @@
 import { Chip } from '@mui/material'
 
-export type StatoNucleo = 'verde' | 'nero' | 'rosso'
+export type StatoNucleo = 'verde' | 'nero' | 'rosso' | 'bozza'
 
-const CONFIG: Record<StatoNucleo, { label: string; color: 'success' | 'default' | 'error' }> = {
+const CONFIG: Record<StatoNucleo, { label: string; color: 'success' | 'default' | 'error' | 'info' | 'warning' }> = {
+  bozza: { label: 'Bozza', color: 'warning' },
   verde: { label: 'Attivo', color: 'success' },
   nero:  { label: 'Non rinnovato', color: 'default' },
   rosso: { label: 'Sospeso', color: 'error' },
