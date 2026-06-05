@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -24,62 +24,63 @@ import {
   TextField,
   Tooltip,
   Typography,
-} from '@mui/material'
-import LocalShippingIcon from '@mui/icons-material/LocalShipping'
-import SearchIcon from '@mui/icons-material/Search'
-import EventBusyIcon from '@mui/icons-material/EventBusy'
-import CheckCircleIcon from '@mui/icons-material/CheckCircle'
-import NoteIcon from '@mui/icons-material/Note'
-import NoteOutlinedIcon from '@mui/icons-material/NoteOutlined'
-import UndoIcon from '@mui/icons-material/Undo'
-import HistoryIcon from '@mui/icons-material/History'
-import type { StatoNucleo } from '@/hooks/useDistribuzione'
-import { ZONE_DISTRIBUZIONE, useDistribuzione } from '@/hooks/useDistribuzione'
-import { useAuth } from '@/hooks/useAuth'
-import StoricoDistribuzioniDialog from '@/components/common/StoricoDistribuzioniDialog'
+} from "@mui/material";
+import LocalShippingIcon from "@mui/icons-material/LocalShipping";
+import SearchIcon from "@mui/icons-material/Search";
+import EventBusyIcon from "@mui/icons-material/EventBusy";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import NoteIcon from "@mui/icons-material/Note";
+import NoteOutlinedIcon from "@mui/icons-material/NoteOutlined";
+import UndoIcon from "@mui/icons-material/Undo";
+import HistoryIcon from "@mui/icons-material/History";
+import type { StatoNucleo } from "@/hooks/useDistribuzione";
+import { ZONE_DISTRIBUZIONE, useDistribuzione } from "@/hooks/useDistribuzione";
+import { useAuth } from "@/hooks/useAuth";
+import StoricoDistribuzioniDialog from "@/components/common/StoricoDistribuzioniDialog";
 
-const STATO_FILTER: Array<{ value: StatoNucleo | ''; label: string }> = [
-  { value: '', label: 'Tutti gli stati' },
-  { value: 'verde', label: 'Attivo' },
-  { value: 'nero', label: 'Non rinnovato' },
-  { value: 'rosso', label: 'Sospeso' },
-]
+const STATO_FILTER: Array<{ value: StatoNucleo | ""; label: string }> = [
+  { value: "", label: "Tutti gli stati" },
+  { value: "verde", label: "Attivo" },
+  { value: "nero", label: "Non rinnovato" },
+  { value: "rosso", label: "Sospeso" },
+];
 
 type PendingUndo = {
-  open: boolean
-  distribuzioneId: string
-  nucleoId: string
-}
+  open: boolean;
+  distribuzioneId: string;
+  nucleoId: string;
+};
 
 type NotaDialogState = {
-  open: boolean
-  distribuzioneId: string
-  nucleoId: string
-  note: string
-}
+  open: boolean;
+  distribuzioneId: string;
+  nucleoId: string;
+  note: string;
+};
 
 type SbloccoDialogState = {
-  open: boolean
-  distribuzioneId: string
-  nucleoId: string
-  label: string
-}
+  open: boolean;
+  distribuzioneId: string;
+  nucleoId: string;
+  label: string;
+};
 
 function renderStato(stato: StatoNucleo) {
-  if (stato === 'verde') return { label: 'Attivo', color: 'success' as const }
-  if (stato === 'nero') return { label: 'Non rinnovato', color: 'warning' as const }
-  return { label: 'Sospeso', color: 'error' as const }
+  if (stato === "verde") return { label: "Attivo", color: "success" as const };
+  if (stato === "nero")
+    return { label: "Non rinnovato", color: "warning" as const };
+  return { label: "Sospeso", color: "error" as const };
 }
 
 function formatDate(value: string | null) {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleDateString('it-IT')
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("it-IT");
 }
 
 export default function Distribuzione() {
-  const { user } = useAuth()
+  const { user } = useAuth();
   const {
     centro,
     setCentro,
@@ -99,129 +100,157 @@ export default function Distribuzione() {
     registerConsegna,
     undoConsegna,
     saveNotaConsegna,
-  } = useDistribuzione()
+  } = useDistribuzione();
 
-  const [successMsg, setSuccessMsg] = useState('')
-  const [numeroPacchiMap, setNumeroPacchiMap] = useState<Record<string, string>>({})
-  const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null)
-  const [notaDialog, setNotaDialog] = useState<NotaDialogState | null>(null)
-  const [sbloccoDialog, setSbloccoDialog] = useState<SbloccoDialogState | null>(null)
-  const [storicoDistNucleoId, setStoricoDistNucleoId] = useState<{ id: string; label: string } | null>(null)
-  const undoTimeoutRef = useRef<number | null>(null)
+  const [successMsg, setSuccessMsg] = useState("");
+  const [numeroPacchiMap, setNumeroPacchiMap] = useState<
+    Record<string, string>
+  >({});
+  const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null);
+  const [notaDialog, setNotaDialog] = useState<NotaDialogState | null>(null);
+  const [sbloccoDialog, setSbloccoDialog] = useState<SbloccoDialogState | null>(
+    null,
+  );
+  const [storicoDistNucleoId, setStoricoDistNucleoId] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
+  const undoTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!centro) return
-    load()
-  }, [centro, load])
+    if (!centro) return;
+    load();
+  }, [centro, load]);
 
   useEffect(() => {
     return () => {
       if (undoTimeoutRef.current) {
-        window.clearTimeout(undoTimeoutRef.current)
+        window.clearTimeout(undoTimeoutRef.current);
       }
-    }
-  }, [])
+    };
+  }, []);
 
   const handleRegister = async (nucleoId: string) => {
-    const numeroPacchiStr = numeroPacchiMap[nucleoId] ?? ''
-    const numeroPacchi = numeroPacchiStr !== '' ? parseInt(numeroPacchiStr, 10) : null
-    const result = await registerConsegna(nucleoId, user?.id, numeroPacchi)
+    const numeroPacchiStr = numeroPacchiMap[nucleoId] ?? "";
+    const numeroPacchi =
+      numeroPacchiStr !== "" ? parseInt(numeroPacchiStr, 10) : null;
+    const result = await registerConsegna(nucleoId, user?.id, numeroPacchi);
     if (!result.ok) {
-      setError(result.message)
-      return
+      setError(result.message);
+      return;
     }
 
     setNumeroPacchiMap((prev) => {
-      const next = { ...prev }
-      delete next[nucleoId]
-      return next
-    })
+      const next = { ...prev };
+      delete next[nucleoId];
+      return next;
+    });
 
-    setSuccessMsg('Consegna registrata. Puoi annullare entro 5 secondi.')
+    setSuccessMsg("Consegna registrata. Puoi annullare entro 5 secondi.");
     setPendingUndo({
       open: true,
       distribuzioneId: result.data.distribuzioneId,
       nucleoId: result.data.nucleoId,
-    })
+    });
 
     if (undoTimeoutRef.current) {
-      window.clearTimeout(undoTimeoutRef.current)
+      window.clearTimeout(undoTimeoutRef.current);
     }
     undoTimeoutRef.current = window.setTimeout(() => {
-      setPendingUndo((current) => (current ? { ...current, open: false } : null))
-      undoTimeoutRef.current = null
-    }, 5000)
-  }
+      setPendingUndo((current) =>
+        current ? { ...current, open: false } : null,
+      );
+      undoTimeoutRef.current = null;
+    }, 5000);
+  };
 
   const handleUndo = async () => {
-    if (!pendingUndo) return
-    const result = await undoConsegna(pendingUndo.distribuzioneId, pendingUndo.nucleoId)
+    if (!pendingUndo) return;
+    const result = await undoConsegna(
+      pendingUndo.distribuzioneId,
+      pendingUndo.nucleoId,
+    );
     if (!result.ok) {
-      setError(result.message)
-      return
+      setError(result.message);
+      return;
     }
 
     if (undoTimeoutRef.current) {
-      window.clearTimeout(undoTimeoutRef.current)
-      undoTimeoutRef.current = null
+      window.clearTimeout(undoTimeoutRef.current);
+      undoTimeoutRef.current = null;
     }
 
-    setPendingUndo(null)
-    setSuccessMsg('Registrazione annullata.')
-  }
+    setPendingUndo(null);
+    setSuccessMsg("Registrazione annullata.");
+  };
 
-  const handleOpenNota = (nucleoId: string, distribuzioneId: string | null, currentNote: string | null) => {
+  const handleOpenNota = (
+    nucleoId: string,
+    distribuzioneId: string | null,
+    currentNote: string | null,
+  ) => {
     if (!distribuzioneId) {
-      setError('Registra prima la consegna per la data selezionata.')
-      return
+      setError("Registra prima la consegna per la data selezionata.");
+      return;
     }
 
     setNotaDialog({
       open: true,
       distribuzioneId,
       nucleoId,
-      note: currentNote ?? '',
-    })
-  }
+      note: currentNote ?? "",
+    });
+  };
 
   const handleSaveNota = async () => {
-    if (!notaDialog) return
+    if (!notaDialog) return;
 
-    const result = await saveNotaConsegna(notaDialog.distribuzioneId, notaDialog.nucleoId, notaDialog.note)
+    const result = await saveNotaConsegna(
+      notaDialog.distribuzioneId,
+      notaDialog.nucleoId,
+      notaDialog.note,
+    );
     if (!result.ok) {
-      setError(result.message)
-      return
+      setError(result.message);
+      return;
     }
 
-    setNotaDialog(null)
-    setSuccessMsg('Nota salvata con successo.')
-  }
+    setNotaDialog(null);
+    setSuccessMsg("Nota salvata con successo.");
+  };
 
-  const handleOpenSblocco = (distribuzioneId: string, nucleoId: string, label: string) => {
+  const handleOpenSblocco = (
+    distribuzioneId: string,
+    nucleoId: string,
+    label: string,
+  ) => {
     setSbloccoDialog({
       open: true,
       distribuzioneId,
       nucleoId,
       label,
-    })
-  }
+    });
+  };
 
   const handleConfermaSblocco = async () => {
-    if (!sbloccoDialog) return
+    if (!sbloccoDialog) return;
 
-    const result = await undoConsegna(sbloccoDialog.distribuzioneId, sbloccoDialog.nucleoId)
+    const result = await undoConsegna(
+      sbloccoDialog.distribuzioneId,
+      sbloccoDialog.nucleoId,
+    );
     if (!result.ok) {
-      setError(result.message)
-      return
+      setError(result.message);
+      return;
     }
 
-    setSbloccoDialog(null)
-    setSuccessMsg('Sblocco completato: ultima distribuzione rimossa.')
-  }
+    setSbloccoDialog(null);
+    setSuccessMsg("Sblocco completato: ultima distribuzione rimossa.");
+  };
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
         <LocalShippingIcon color="primary" />
         <Typography variant="h5">Distribuzione</Typography>
       </Box>
@@ -231,13 +260,17 @@ export default function Distribuzione() {
       </Typography>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>
           {error}
         </Alert>
       )}
 
       {successMsg && (
-        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccessMsg('')}>
+        <Alert
+          severity="success"
+          sx={{ mb: 2 }}
+          onClose={() => setSuccessMsg("")}
+        >
           {successMsg}
         </Alert>
       )}
@@ -245,14 +278,14 @@ export default function Distribuzione() {
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Box
           sx={{
-            display: 'flex',
-            flexDirection: { xs: 'column', md: 'row' },
-            alignItems: { xs: 'stretch', md: 'flex-start' },
-            justifyContent: { md: 'space-between' },
+            display: "flex",
+            flexDirection: { xs: "column", md: "row" },
+            alignItems: { xs: "stretch", md: "flex-start" },
+            justifyContent: { md: "space-between" },
             gap: 1.5,
           }}
         >
-          <Box sx={{ width: { xs: '100%', md: 220 }, flexShrink: 0 }}>
+          <Box sx={{ width: { xs: "100%", md: 220 }, flexShrink: 0 }}>
             <TextField
               label="Data distribuzione"
               type="date"
@@ -267,24 +300,30 @@ export default function Distribuzione() {
           </Box>
 
           <Stack
-            direction={{ xs: 'column', md: 'row' }}
+            direction={{ xs: "column", md: "row" }}
             spacing={1.2}
             sx={{
-              width: { xs: '100%', md: 'auto' },
-              ml: { md: 'auto' },
+              width: { xs: "100%", md: "auto" },
+              ml: { md: "auto" },
             }}
           >
             <TextField
               label="Centro"
               size="small"
               value={centro}
-              onChange={(event) => setCentro(event.target.value as (typeof ZONE_DISTRIBUZIONE)[number])}
+              onChange={(event) =>
+                setCentro(
+                  event.target.value as (typeof ZONE_DISTRIBUZIONE)[number],
+                )
+              }
               select
               fullWidth
-              sx={{ width: { xs: '100%', md: 170 } }}
+              sx={{ width: { xs: "100%", md: 170 } }}
             >
               {ZONE_DISTRIBUZIONE.map((item) => (
-                <MenuItem key={item} value={item}>{item}</MenuItem>
+                <MenuItem key={item} value={item}>
+                  {item}
+                </MenuItem>
               ))}
             </TextField>
 
@@ -292,13 +331,17 @@ export default function Distribuzione() {
               label="Stato"
               size="small"
               value={statoFilter}
-              onChange={(event) => setStatoFilter(event.target.value as StatoNucleo | '')}
+              onChange={(event) =>
+                setStatoFilter(event.target.value as StatoNucleo | "")
+              }
               select
               fullWidth
-              sx={{ width: { xs: '100%', md: 170 } }}
+              sx={{ width: { xs: "100%", md: 170 } }}
             >
               {STATO_FILTER.map((item) => (
-                <MenuItem key={item.label} value={item.value}>{item.label}</MenuItem>
+                <MenuItem key={item.label} value={item.value}>
+                  {item.label}
+                </MenuItem>
               ))}
             </TextField>
 
@@ -309,7 +352,7 @@ export default function Distribuzione() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               fullWidth
-              sx={{ width: { xs: '100%', md: 300 } }}
+              sx={{ width: { xs: "100%", md: 300 } }}
               slotProps={{
                 input: {
                   startAdornment: (
@@ -348,7 +391,9 @@ export default function Distribuzione() {
             {loading ? (
               <TableRow>
                 <TableCell colSpan={8}>
-                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                  <Box
+                    sx={{ display: "flex", justifyContent: "center", py: 3 }}
+                  >
                     <CircularProgress size={26} />
                   </Box>
                 </TableCell>
@@ -358,18 +403,22 @@ export default function Distribuzione() {
                 <TableCell colSpan={8}>
                   <Typography color="text.secondary" sx={{ py: 1 }}>
                     {centro
-                      ? 'Nessun nucleo trovato con i filtri selezionati.'
-                      : 'Nessun dato da mostrare.'}
+                      ? "Nessun nucleo trovato con i filtri selezionati."
+                      : "Nessun dato da mostrare."}
                   </Typography>
                 </TableCell>
               </TableRow>
             ) : (
               rows.map((row) => {
-                const stato = renderStato(row.stato)
-                const isSaving = savingId === row.nucleoId
-                const disabled = isSaving || row.giaServitoSettimana
-                const canUndoRow = Boolean(pendingUndo?.open && pendingUndo.nucleoId === row.nucleoId)
-                const canSbloccaRow = Boolean(row.giaServitoSettimana && row.distribuzioneSelezionataId)
+                const stato = renderStato(row.stato);
+                const isSaving = savingId === row.nucleoId;
+                const disabled = isSaving || row.giaServitoSettimana;
+                const canUndoRow = Boolean(
+                  pendingUndo?.open && pendingUndo.nucleoId === row.nucleoId,
+                );
+                const canSbloccaRow = Boolean(
+                  row.giaServitoSettimana && row.distribuzioneSelezionataId,
+                );
 
                 return (
                   <TableRow key={row.nucleoId} hover>
@@ -380,28 +429,43 @@ export default function Distribuzione() {
                         </Typography>
                         {row.capofamigliaDiverso && (
                           <Typography variant="caption" color="text.secondary">
-                            Capofamiglia: {row.cognomeCapofamiglia} {row.nomeCapofamiglia}
+                            Capofamiglia: {row.cognomeCapofamiglia}{" "}
+                            {row.nomeCapofamiglia}
                           </Typography>
                         )}
                       </Stack>
                     </TableCell>
-                    <TableCell>{row.codiceFiscale || '—'}</TableCell>
+                    <TableCell>{row.codiceFiscale || "—"}</TableCell>
                     <TableCell>
                       <Stack direction="column" spacing={0.4}>
-                        <Typography variant="body2">{row.numeroTessera || '—'}</Typography>
+                        <Typography variant="body2">
+                          {row.numeroTessera || "—"}
+                        </Typography>
                         <Typography variant="caption" color="text.secondary">
                           Scad. {formatDate(row.scadenzaTessera)}
                         </Typography>
                       </Stack>
                     </TableCell>
                     <TableCell>
-                      <Chip label={stato.label} color={stato.color} size="small" />
+                      <Chip
+                        label={stato.label}
+                        color={stato.color}
+                        size="small"
+                      />
                     </TableCell>
                     <TableCell>
                       {row.giaServitoSettimana ? (
-                        <Stack direction="row" spacing={0.6} sx={{ alignItems: 'center' }}>
+                        <Stack
+                          direction="row"
+                          spacing={0.6}
+                          sx={{ alignItems: "center" }}
+                        >
                           <EventBusyIcon color="error" sx={{ fontSize: 16 }} />
-                          <Typography variant="body2" color="error.main" sx={{ fontWeight: 700 }}>
+                          <Typography
+                            variant="body2"
+                            color="error.main"
+                            sx={{ fontWeight: 700 }}
+                          >
                             Registrato il {formatDate(row.ultimaDistribuzione)}
                           </Typography>
                         </Stack>
@@ -413,16 +477,22 @@ export default function Distribuzione() {
                     </TableCell>
                     <TableCell>
                       {row.giaServitoSettimana ? (
-                        <Typography variant="body2" sx={{ fontWeight: 700, textAlign: 'center' }}>
-                          {row.numeroPacchi != null ? row.numeroPacchi : '—'}
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 700, textAlign: "center" }}
+                        >
+                          {row.numeroPacchi != null ? row.numeroPacchi : "—"}
                         </Typography>
                       ) : (
                         <TextField
                           type="number"
                           size="small"
-                          value={numeroPacchiMap[row.nucleoId] ?? ''}
+                          value={numeroPacchiMap[row.nucleoId] ?? ""}
                           onChange={(e) =>
-                            setNumeroPacchiMap((prev) => ({ ...prev, [row.nucleoId]: e.target.value }))
+                            setNumeroPacchiMap((prev) => ({
+                              ...prev,
+                              [row.nucleoId]: e.target.value,
+                            }))
                           }
                           slotProps={{ htmlInput: { min: 0 } }}
                           sx={{ width: 80 }}
@@ -431,17 +501,33 @@ export default function Distribuzione() {
                       )}
                     </TableCell>
                     <TableCell align="center">
-                      <Tooltip title={row.haNotaDistribuzione ? 'Modifica nota' : 'Aggiungi nota'}>
+                      <Tooltip
+                        title={
+                          row.haNotaDistribuzione
+                            ? "Modifica nota"
+                            : "Aggiungi nota"
+                        }
+                      >
                         <span>
                           <IconButton
                             size="small"
                             onClick={() =>
-                              handleOpenNota(row.nucleoId, row.distribuzioneSelezionataId, row.notaDistribuzione)
+                              handleOpenNota(
+                                row.nucleoId,
+                                row.distribuzioneSelezionataId,
+                                row.notaDistribuzione,
+                              )
                             }
                             disabled={isSaving}
-                            color={row.haNotaDistribuzione ? 'primary' : 'default'}
+                            color={
+                              row.haNotaDistribuzione ? "primary" : "default"
+                            }
                           >
-                            {row.haNotaDistribuzione ? <NoteIcon fontSize="small" /> : <NoteOutlinedIcon fontSize="small" />}
+                            {row.haNotaDistribuzione ? (
+                              <NoteIcon fontSize="small" />
+                            ) : (
+                              <NoteOutlinedIcon fontSize="small" />
+                            )}
                           </IconButton>
                         </span>
                       </Tooltip>
@@ -451,7 +537,8 @@ export default function Distribuzione() {
                           onClick={() =>
                             setStoricoDistNucleoId({
                               id: row.nucleoId,
-                              label: `${row.cognomeTesserato} ${row.nomeTesserato}`.trim(),
+                              label:
+                                `${row.cognomeTesserato} ${row.nomeTesserato}`.trim(),
                             })
                           }
                         >
@@ -502,14 +589,20 @@ export default function Distribuzione() {
                           size="small"
                           onClick={() => handleRegister(row.nucleoId)}
                           disabled={disabled}
-                          startIcon={isSaving ? <CircularProgress size={14} color="inherit" /> : <CheckCircleIcon />}
+                          startIcon={
+                            isSaving ? (
+                              <CircularProgress size={14} color="inherit" />
+                            ) : (
+                              <CheckCircleIcon />
+                            )
+                          }
                         >
                           Registra
                         </Button>
                       )}
                     </TableCell>
                   </TableRow>
-                )
+                );
               })
             )}
           </TableBody>
@@ -522,8 +615,12 @@ export default function Distribuzione() {
 
       <Snackbar
         open={Boolean(pendingUndo?.open)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        onClose={() => setPendingUndo((current) => (current ? { ...current, open: false } : null))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        onClose={() =>
+          setPendingUndo((current) =>
+            current ? { ...current, open: false } : null,
+          )
+        }
         message="Consegna registrata"
         action={
           <Button size="small" color="secondary" onClick={handleUndo}>
@@ -542,14 +639,14 @@ export default function Distribuzione() {
         <DialogContent>
           <TextField
             label="Nota"
-            value={notaDialog?.note ?? ''}
+            value={notaDialog?.note ?? ""}
             onChange={(event) =>
               setNotaDialog((current) =>
                 current
                   ? {
-                    ...current,
-                    note: event.target.value,
-                  }
+                      ...current,
+                      note: event.target.value,
+                    }
                   : current,
               )
             }
@@ -586,11 +683,10 @@ export default function Distribuzione() {
       >
         <DialogTitle>Conferma sblocco</DialogTitle>
         <DialogContent>
-          <Typography>
-            Sei sicuro di sbloccarlo?
-          </Typography>
+          <Typography>Sei sicuro di sbloccarlo?</Typography>
           <Typography color="text.secondary" sx={{ mt: 1 }}>
-            Verrà cancellata l'ultima distribuzione di {sbloccoDialog?.label} e il nucleo tornerà allo stato precedente.
+            Verrà cancellata l'ultima distribuzione di {sbloccoDialog?.label} e
+            il nucleo tornerà allo stato precedente.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -606,5 +702,5 @@ export default function Distribuzione() {
         </DialogActions>
       </Dialog>
     </Box>
-  )
+  );
 }

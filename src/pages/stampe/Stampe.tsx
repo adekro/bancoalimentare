@@ -594,7 +594,7 @@ export default function Stampe() {
           value: (n) => getUltimaIscrizione(n.iscrizioni)?.data_scadenza ?? "",
         },
       ],
-      `lista_nuclei_${new Date().toISOString().slice(0, 10)}.xlsx`,
+      `lista_nuclei_${new Date().toISOString().slice(0, 10)}.xls`,
       "ListaNuclei",
     );
   }
@@ -612,7 +612,7 @@ export default function Stampe() {
         { header: "Numero pacchi", value: (r) => r.numeroPacchi ?? "" },
         { header: "Centro", value: (r) => r.centro },
       ],
-      `ultime_distribuzioni_${new Date().toISOString().slice(0, 10)}.xlsx`,
+      `ultime_distribuzioni_${new Date().toISOString().slice(0, 10)}.xls`,
       "UltimeDistribuzioni",
     );
   }
@@ -632,7 +632,7 @@ export default function Stampe() {
         { header: "Numero pacchi", value: (r) => r.numeroPacchi ?? "" },
         { header: "Centro", value: (r) => r.centro },
       ],
-      `consegne_settore_${new Date().toISOString().slice(0, 10)}.xlsx`,
+      `consegne_settore_${new Date().toISOString().slice(0, 10)}.xls`,
       "ConsegneSettore",
     );
   }
@@ -742,7 +742,7 @@ export default function Stampe() {
                   startIcon={<DownloadIcon />}
                   onClick={esportaListaNucleiXML}
                 >
-                  Export XML (.xlsx)
+                  Export XML (.xls)
                 </Button>
                 <Button
                   variant="contained"
@@ -916,7 +916,7 @@ export default function Stampe() {
                   startIcon={<DownloadIcon />}
                   onClick={esportaUltimeDistribuzioniXML}
                 >
-                  Export XML (.xlsx)
+                  Export XML (.xls)
                 </Button>
                 <Button
                   variant="contained"
@@ -1072,7 +1072,7 @@ export default function Stampe() {
                   startIcon={<DownloadIcon />}
                   onClick={esportaConsegneSettoreXML}
                 >
-                  Export XML (.xlsx)
+                  Export XML (.xls)
                 </Button>
                 <Button
                   variant="contained"
