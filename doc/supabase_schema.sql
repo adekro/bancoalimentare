@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS public.access_requests (
 CREATE TABLE IF NOT EXISTS public.nuclei (
     id              UUID               PRIMARY KEY DEFAULT uuid_generate_v4(),
     numero_nucleo_familiare TEXT,
+    numero_componenti INTEGER,
     codice_fiscale  TEXT               UNIQUE,
     telefono        TEXT,
     indirizzo       TEXT,
@@ -100,6 +101,7 @@ CREATE TABLE IF NOT EXISTS public.componenti (
 
 -- Allinea schema su database gia esistenti
 ALTER TABLE public.nuclei ADD COLUMN IF NOT EXISTS numero_nucleo_familiare TEXT;
+ALTER TABLE public.nuclei ADD COLUMN IF NOT EXISTS numero_componenti INTEGER;
 ALTER TABLE public.nuclei ADD COLUMN IF NOT EXISTS telefono TEXT;
 ALTER TABLE public.nuclei ADD COLUMN IF NOT EXISTS indirizzo TEXT;
 

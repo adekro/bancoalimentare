@@ -226,6 +226,7 @@ export default function DettaglioUtente() {
 
   // Stato form nucleo
   const [numeroNucleoFamiliare, setNumeroNucleoFamiliare] = useState("");
+  const [numeroComponenti, setNumeroComponenti] = useState("");
   const [cfTesserato, setCfTesserato] = useState("");
   const [numeroTessera, setNumeroTessera] = useState("");
   const [scadenzaTessera, setScadenzaTessera] = useState("");
@@ -346,6 +347,9 @@ export default function DettaglioUtente() {
 
       // Popola stato form
       setNumeroNucleoFamiliare(nucl.numero_nucleo_familiare ?? "");
+      setNumeroComponenti(
+        nucl.numero_componenti != null ? String(nucl.numero_componenti) : "",
+      );
       setTelefono(nucl.telefono ?? "");
       setIndirizzo(nucl.indirizzo ?? "");
       setZona(nucl.zona ?? "");
@@ -456,9 +460,14 @@ export default function DettaglioUtente() {
 
     const latestIscrizione = iscrizioni[0] ?? null;
     const normalizedNumeroNucleoFamiliare = numeroNucleoFamiliare.trim();
+    const normalizedNumeroComponenti = numeroComponenti.trim();
     const normalizedCf = cfTesserato.trim().toUpperCase();
     const normalizedNumeroTessera = numeroTessera.trim();
     const normalizedScadenzaTessera = scadenzaTessera || null;
+    const numeroComponentiValue =
+      normalizedNumeroComponenti === ""
+        ? null
+        : Number.parseInt(normalizedNumeroComponenti, 10);
     const scadenzaYear = getYearFromIsoDate(normalizedScadenzaTessera);
     const numeroTesseraChanged =
       normalizedNumeroTessera !== (latestIscrizione?.numero_tessera ?? "");
@@ -472,6 +481,17 @@ export default function DettaglioUtente() {
       setError(
         "Per verificare il numero tessera devi indicare una data di scadenza valida.",
       );
+      setSaving(false);
+      return;
+    }
+
+    if (
+      normalizedNumeroComponenti !== "" &&
+      (numeroComponentiValue == null ||
+        !Number.isInteger(numeroComponentiValue) ||
+        numeroComponentiValue < 0)
+    ) {
+      setError("Numero componenti non valido.");
       setSaving(false);
       return;
     }
@@ -553,6 +573,7 @@ export default function DettaglioUtente() {
       .from("nuclei")
       .update({
         numero_nucleo_familiare: normalizedNumeroNucleoFamiliare || null,
+        numero_componenti: numeroComponentiValue,
         codice_fiscale: null,
         telefono: telefono.trim() || null,
         indirizzo: indirizzo.trim() || null,
@@ -855,6 +876,14 @@ export default function DettaglioUtente() {
                   label="Numero nucleo familiare"
                   value={numeroNucleoFamiliare}
                   onChange={(e) => setNumeroNucleoFamiliare(e.target.value)}
+                  sx={{ flex: 1, minWidth: 220 }}
+                />
+                <TextField
+                  label="Numero componenti"
+                  type="number"
+                  value={numeroComponenti}
+                  onChange={(e) => setNumeroComponenti(e.target.value)}
+                  slotProps={{ htmlInput: { min: 0 } }}
                   sx={{ flex: 1, minWidth: 220 }}
                 />
                 <TextField

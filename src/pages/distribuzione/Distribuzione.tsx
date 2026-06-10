@@ -415,6 +415,13 @@ export default function Distribuzione() {
                 const stato = renderStato(row.stato);
                 const isSaving = savingId === row.nucleoId;
                 const disabled = isSaving || row.giaServitoSettimana;
+                const pacchiValue =
+                  numeroPacchiMap[row.nucleoId] ??
+                  (row.numeroPacchi != null
+                    ? String(row.numeroPacchi)
+                    : row.numeroComponenti != null
+                      ? String(row.numeroComponenti)
+                      : "");
                 const canUndoRow = Boolean(
                   pendingUndo?.open && pendingUndo.nucleoId === row.nucleoId,
                 );
@@ -489,7 +496,7 @@ export default function Distribuzione() {
                         <TextField
                           type="number"
                           size="small"
-                          value={numeroPacchiMap[row.nucleoId] ?? ""}
+                          value={pacchiValue}
                           onChange={(e) =>
                             setNumeroPacchiMap((prev) => ({
                               ...prev,

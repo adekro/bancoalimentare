@@ -16,6 +16,7 @@ export type DistribuzioneRow = {
   codiceFiscale: string | null;
   zona: ZonaDistribuzione;
   stato: StatoNucleo;
+  numeroComponenti: number | null;
   cognomeTesserato: string;
   nomeTesserato: string;
   cognomeCapofamiglia: string | null;
@@ -36,6 +37,7 @@ type NucleoRaw = {
   codice_fiscale: string | null;
   zona: ZonaDistribuzione;
   stato: StatoNucleo;
+  numero_componenti: number | null;
   componenti: Array<{
     id: string;
     ruolo: string;
@@ -145,6 +147,7 @@ function mapNucleoToRow(
     codiceFiscale: principale?.codice_fiscale ?? nucleo.codice_fiscale,
     zona: nucleo.zona,
     stato: nucleo.stato,
+    numeroComponenti: nucleo.numero_componenti,
     cognomeTesserato: principale?.cognome?.trim() ?? "—",
     nomeTesserato: principale?.nome?.trim() ?? "",
     cognomeCapofamiglia: capofamiglia?.cognome?.trim() ?? null,
@@ -215,7 +218,7 @@ export function useDistribuzione() {
       supabase
         .from("nuclei")
         .select(
-          "id, codice_fiscale, zona, stato, componenti(id, ruolo, nome, cognome, codice_fiscale, data_nascita), iscrizioni(id, numero_tessera, data_scadenza, created_at)",
+          "id, codice_fiscale, zona, stato, numero_componenti, componenti(id, ruolo, nome, cognome, codice_fiscale, data_nascita), iscrizioni(id, numero_tessera, data_scadenza, created_at)",
         )
         .eq("archiviato", false)
         .eq("zona", centro),

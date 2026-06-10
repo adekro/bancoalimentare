@@ -186,6 +186,7 @@ export default function NuovoUtente() {
   const location = useLocation();
   const [cfTesserato, setCfTesserato] = useState("");
   const [numeroNucleoFamiliare, setNumeroNucleoFamiliare] = useState("");
+  const [numeroComponenti, setNumeroComponenti] = useState("");
   const [zona, setZona] = useState("");
   const [telefono, setTelefono] = useState("");
   const [indirizzo, setIndirizzo] = useState("");
@@ -246,7 +247,23 @@ export default function NuovoUtente() {
     const normalizedNumeroNucleoFamiliare = numeroNucleoFamiliare.trim();
     const normalizedCf = cfTesserato.trim().toUpperCase();
     const normalizedTessNumero = tessNumero.trim();
+    const normalizedNumeroComponenti = numeroComponenti.trim();
+    const numeroComponentiValue =
+      normalizedNumeroComponenti === ""
+        ? null
+        : Number.parseInt(normalizedNumeroComponenti, 10);
     const tesseraYear = getYearFromIsoDate(tessDataScadenza || null);
+
+    if (
+      normalizedNumeroComponenti !== "" &&
+      (numeroComponentiValue == null ||
+        !Number.isInteger(numeroComponentiValue) ||
+        numeroComponentiValue < 0)
+    ) {
+      setError("Numero componenti non valido.");
+      setLoading(false);
+      return;
+    }
 
     if (normalizedTessNumero && !tesseraYear) {
       setError(
@@ -330,6 +347,7 @@ export default function NuovoUtente() {
       .from("nuclei")
       .insert({
         numero_nucleo_familiare: normalizedNumeroNucleoFamiliare || null,
+        numero_componenti: numeroComponentiValue,
         telefono: telefono.trim() || null,
         indirizzo: indirizzo.trim() || null,
         zona,
@@ -517,6 +535,14 @@ export default function NuovoUtente() {
                   label="Numero nucleo familiare"
                   value={numeroNucleoFamiliare}
                   onChange={(e) => setNumeroNucleoFamiliare(e.target.value)}
+                  sx={{ flex: 1, minWidth: { md: 220 } }}
+                />
+                <TextField
+                  label="Numero componenti"
+                  type="number"
+                  value={numeroComponenti}
+                  onChange={(e) => setNumeroComponenti(e.target.value)}
+                  slotProps={{ htmlInput: { min: 0 } }}
                   sx={{ flex: 1, minWidth: { md: 220 } }}
                 />
                 <TextField
