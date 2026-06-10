@@ -73,8 +73,22 @@ function getWeekRangeISO(baseDate = new Date()) {
   start.setHours(0, 0, 0, 0);
 
   const end = new Date(start);
-  end.setDate(start.getDate() + 1); // distanza di 1 giorno da lunedì a martedì
+  end.setDate(start.getDate() + 6);
   end.setHours(23, 59, 59, 999);
+
+  return {
+    start: start.toISOString().slice(0, 10),
+    end: end.toISOString().slice(0, 10),
+  };
+}
+
+function getRangeISO(baseDate = new Date(), daysBefore = 30) {
+  const end = new Date(baseDate);
+  end.setHours(23, 59, 59, 999);
+
+  const start = new Date(end);
+  start.setDate(end.getDate() - daysBefore);
+  start.setHours(0, 0, 0, 0);
 
   return {
     start: start.toISOString().slice(0, 10),
@@ -212,7 +226,7 @@ export function useDistribuzione() {
     setLoading(true);
     setError("");
 
-    const { start, end } = getWeekRangeISO(new Date(dataDistribuzione));
+    const { start, end } = getRangeISO(new Date(dataDistribuzione), 1);
 
     const [nucleiResult, distResult] = await Promise.all([
       supabase
