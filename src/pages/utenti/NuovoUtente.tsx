@@ -537,14 +537,7 @@ export default function NuovoUtente() {
                   onChange={(e) => setNumeroNucleoFamiliare(e.target.value)}
                   sx={{ flex: 1, minWidth: { md: 220 } }}
                 />
-                <TextField
-                  label="Numero componenti"
-                  type="number"
-                  value={numeroComponenti}
-                  onChange={(e) => setNumeroComponenti(e.target.value)}
-                  slotProps={{ htmlInput: { min: 0 } }}
-                  sx={{ flex: 1, minWidth: { md: 220 } }}
-                />
+
                 <TextField
                   label="Numero Tessera"
                   placeholder="Es. BA-2024-001"
@@ -592,6 +585,14 @@ export default function NuovoUtente() {
                 onChange={(e) => setIndirizzo(e.target.value)}
               />
               <Stack direction={{ xs: "column", md: "row" }} sx={{ gap: 2.2 }}>
+                <TextField
+                  label="Numero componenti"
+                  type="number"
+                  value={numeroComponenti}
+                  onChange={(e) => setNumeroComponenti(e.target.value)}
+                  slotProps={{ htmlInput: { min: 0 } }}
+                  sx={{ flex: 1, minWidth: { md: 220 } }}
+                />
                 <TextField
                   label="Codice Fiscale del tesserato"
                   value={cfTesserato}

@@ -878,14 +878,7 @@ export default function DettaglioUtente() {
                   onChange={(e) => setNumeroNucleoFamiliare(e.target.value)}
                   sx={{ flex: 1, minWidth: 220 }}
                 />
-                <TextField
-                  label="Numero componenti"
-                  type="number"
-                  value={numeroComponenti}
-                  onChange={(e) => setNumeroComponenti(e.target.value)}
-                  slotProps={{ htmlInput: { min: 0 } }}
-                  sx={{ flex: 1, minWidth: 220 }}
-                />
+
                 <TextField
                   label="Numero tessera"
                   value={numeroTessera}
@@ -952,6 +945,14 @@ export default function DettaglioUtente() {
                 />
               </Stack>
               <Stack direction="row" sx={{ gap: 2.2, flexWrap: "wrap" }}>
+                <TextField
+                  label="Numero componenti"
+                  type="number"
+                  value={numeroComponenti}
+                  onChange={(e) => setNumeroComponenti(e.target.value)}
+                  slotProps={{ htmlInput: { min: 0 } }}
+                  sx={{ flex: 1, minWidth: 220 }}
+                />
                 <Button
                   variant="outlined"
                   startIcon={<HistoryIcon />}
