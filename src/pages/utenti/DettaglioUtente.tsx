@@ -336,6 +336,8 @@ export default function DettaglioUtente() {
   // Stato form nucleo
   const [numeroNucleoFamiliare, setNumeroNucleoFamiliare] = useState("");
   const [cfTesserato, setCfTesserato] = useState("");
+  const [numeroTessera, setNumeroTessera] = useState("");
+  const [scadenzaTessera, setScadenzaTessera] = useState("");
   const [telefono, setTelefono] = useState("");
   const [indirizzo, setIndirizzo] = useState("");
   const [zona, setZona] = useState("");
@@ -522,10 +524,15 @@ export default function DettaglioUtente() {
 
       setIscrizioni(isc ?? []);
       if (isc && isc.length > 0) {
+        setNumeroTessera(isc[0].numero_tessera ?? "");
+        setScadenzaTessera(isc[0].data_scadenza ?? "");
         setNuovaIscrizione((prev) => ({
           ...prev,
           numero_tessera: isc[0].numero_tessera,
         }));
+      } else {
+        setNumeroTessera("");
+        setScadenzaTessera("");
       }
 
       setPageLoading(false);
@@ -552,6 +559,17 @@ export default function DettaglioUtente() {
     }
     setError("");
     setSaving(true);
+
+    const latestIscrizione = iscrizioni[0] ?? null;
+    const normalizedNumeroTessera = numeroTessera.trim();
+    const normalizedScadenzaTessera = scadenzaTessera || null;
+    const numeroTesseraChanged =
+      normalizedNumeroTessera !== (latestIscrizione?.numero_tessera ?? "");
+    const scadenzaTesseraChanged =
+      normalizedScadenzaTessera !== (latestIscrizione?.data_scadenza ?? null);
+    const shouldCreateRinnovo =
+      Boolean(normalizedNumeroTessera) &&
+      (!latestIscrizione || numeroTesseraChanged || scadenzaTesseraChanged);
 
     // 1. Aggiorna nucleo
     const { error: nuclErr } = await supabase
@@ -645,6 +663,35 @@ export default function DettaglioUtente() {
       setError(`Errore inserimento componenti: ${compErr.message}`);
       setSaving(false);
       return;
+    }
+
+    if (shouldCreateRinnovo) {
+      const { data: newIscrizione, error: iscrErr } = await supabase
+        .from("iscrizioni")
+        .insert({
+          nucleo_id: id,
+          numero_tessera: normalizedNumeroTessera,
+          data_scadenza: normalizedScadenzaTessera,
+          note: "Rinnovo registrato da modifica nucleo",
+        })
+        .select(
+          "id, numero_tessera, data_inizio, data_scadenza, note, created_at",
+        )
+        .single();
+
+      if (iscrErr || !newIscrizione) {
+        setError(iscrErr?.message ?? "Errore salvataggio rinnovo iscrizione.");
+        setSaving(false);
+        return;
+      }
+
+      setIscrizioni((prev) => [newIscrizione, ...prev]);
+      setNuovaIscrizione({
+        numero_tessera: newIscrizione.numero_tessera,
+        data_inizio: "",
+        data_scadenza: "",
+        note: "",
+      });
     }
 
     setSaving(false);
@@ -818,20 +865,17 @@ export default function DettaglioUtente() {
                 />
                 <TextField
                   label="Numero tessera"
-                  value={iscrizioni[0]?.numero_tessera ?? "—"}
-                  slotProps={{ htmlInput: { readOnly: true } }}
+                  value={numeroTessera}
+                  onChange={(e) => setNumeroTessera(e.target.value)}
+                  placeholder="Inserisci numero tessera"
                   sx={{ flex: 1, minWidth: 220 }}
                 />
                 <TextField
                   label="Scadenza"
-                  value={
-                    iscrizioni[0]?.data_scadenza
-                      ? new Date(
-                          iscrizioni[0].data_scadenza,
-                        ).toLocaleDateString("it-IT")
-                      : "—"
-                  }
-                  slotProps={{ htmlInput: { readOnly: true } }}
+                  type="date"
+                  value={scadenzaTessera}
+                  onChange={(e) => setScadenzaTessera(e.target.value)}
+                  slotProps={{ inputLabel: { shrink: true } }}
                   sx={{ flex: 1, minWidth: 220 }}
                 />
 
