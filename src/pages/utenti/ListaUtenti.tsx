@@ -116,6 +116,7 @@ type ImportOutcome = {
 
 type SortDirection = "asc" | "desc";
 type ListaUtentiSortKey =
+  | "numeroNucleo"
   | "nominativo"
   | "codiceFiscale"
   | "zona"
@@ -351,6 +352,7 @@ export default function ListaUtenti() {
         )[0];
 
       const valueA = {
+        numeroNucleo: a.numero_nucleo_familiare?.trim() || null,
         nominativo: getNomePrincipale(a.componenti),
         codiceFiscale: getCodiceFiscaleTesserato(a),
         zona: a.zona,
@@ -359,6 +361,7 @@ export default function ListaUtenti() {
         stato: renderInlineStatus(a.stato).label,
       }[sortBy];
       const valueB = {
+        numeroNucleo: b.numero_nucleo_familiare?.trim() || null,
         nominativo: getNomePrincipale(b.componenti),
         codiceFiscale: getCodiceFiscaleTesserato(b),
         zona: b.zona,
@@ -373,6 +376,7 @@ export default function ListaUtenti() {
     });
 
   const sortableHeaders: Array<{ key: ListaUtentiSortKey; label: string }> = [
+    { key: "numeroNucleo", label: "N" },
     { key: "nominativo", label: "Nominativo" },
     { key: "codiceFiscale", label: "Codice Fiscale" },
     { key: "zona", label: "Zona" },
@@ -1159,7 +1163,7 @@ export default function ListaUtenti() {
               {pagedRows.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={7}
+                    colSpan={8}
                     align="center"
                     sx={{ py: 5, color: "text.secondary" }}
                   >
@@ -1188,133 +1192,127 @@ export default function ListaUtenti() {
                   const isUpdating = statoUpdatingId === n.id;
                   return (
                     <TableRow key={n.id} hover>
-                      <TableCell>
-                        <Stack
-                          direction="row"
-                          spacing={1.2}
-                          sx={{ alignItems: "center" }}
+                      <TableCell sx={{ width: 72 }}>
+                        <Box
+                          sx={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: "50%",
+                            bgcolor: "rgba(26, 110, 60, 0.12)",
+                            color: "primary.main",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 11,
+                            fontWeight: 800,
+                          }}
                         >
-                          <Box
-                            sx={{
-                              width: 28,
-                              height: 28,
-                              borderRadius: "50%",
-                              bgcolor: "rgba(26, 110, 60, 0.12)",
-                              color: "primary.main",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: 11,
-                              fontWeight: 800,
-                            }}
+                          {n.numero_nucleo_familiare?.trim() || "nd"}
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Box>
+                          <Typography sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                            {nome}
+                          </Typography>
+                          <Stack
+                            direction="row"
+                            spacing={0.7}
+                            sx={{ alignItems: "center" }}
                           >
-                            {n.numero_nucleo_familiare?.trim() || "nd"}
-                          </Box>
-                          <Box>
-                            <Typography
-                              sx={{ fontWeight: 700, lineHeight: 1.2 }}
+                            <Tooltip
+                              title={
+                                capoCoincideConTitolare
+                                  ? "Capofamiglia coincidente con titolare tessera"
+                                  : "Capofamiglia diverso da titolare tessera"
+                              }
                             >
-                              {nome}
-                            </Typography>
-                            <Stack
-                              direction="row"
-                              spacing={0.7}
-                              sx={{ alignItems: "center" }}
-                            >
-                              <Tooltip
-                                title={
-                                  capoCoincideConTitolare
-                                    ? "Capofamiglia coincidente con titolare tessera"
-                                    : "Capofamiglia diverso da titolare tessera"
-                                }
-                              >
-                                {capoCoincideConTitolare ? (
-                                  <BadgeIcon
-                                    sx={{ fontSize: 16, color: "success.main" }}
-                                  />
-                                ) : (
-                                  <BadgeOutlinedIcon
-                                    sx={{ fontSize: 16, color: "warning.main" }}
-                                  />
-                                )}
-                              </Tooltip>
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                {capoCoincideConTitolare
-                                  ? "Capofamiglia = Titolare"
-                                  : "Capofamiglia distinto dal titolare"}
-                              </Typography>
-                            </Stack>
+                              {capoCoincideConTitolare ? (
+                                <BadgeIcon
+                                  sx={{ fontSize: 16, color: "success.main" }}
+                                />
+                              ) : (
+                                <BadgeOutlinedIcon
+                                  sx={{ fontSize: 16, color: "warning.main" }}
+                                />
+                              )}
+                            </Tooltip>
                             <Typography
                               variant="caption"
                               color="text.secondary"
-                              onClick={() => toggleExpandNucleo(n.id)}
-                              sx={{
-                                cursor: "pointer",
-                                textDecoration: "underline dotted",
-                              }}
                             >
-                              Nucleo: {Math.max(n.componenti.length, 1)} persone
+                              {capoCoincideConTitolare
+                                ? "Capofamiglia = Titolare"
+                                : "Capofamiglia distinto dal titolare"}
                             </Typography>
-                            {isExpanded && (
-                              <Stack spacing={0.45} sx={{ mt: 0.8 }}>
-                                {componentiOrdinati.length === 0 ? (
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
+                          </Stack>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            onClick={() => toggleExpandNucleo(n.id)}
+                            sx={{
+                              cursor: "pointer",
+                              textDecoration: "underline dotted",
+                            }}
+                          >
+                            Nucleo: {Math.max(n.componenti.length, 1)} persone
+                          </Typography>
+                          {isExpanded && (
+                            <Stack spacing={0.45} sx={{ mt: 0.8 }}>
+                              {componentiOrdinati.length === 0 ? (
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                >
+                                  Nessun componente disponibile
+                                </Typography>
+                              ) : (
+                                componentiOrdinati.map((c) => (
+                                  <Stack
+                                    key={c.id}
+                                    direction="row"
+                                    spacing={0.5}
+                                    sx={{ alignItems: "center" }}
                                   >
-                                    Nessun componente disponibile
-                                  </Typography>
-                                ) : (
-                                  componentiOrdinati.map((c) => (
-                                    <Stack
-                                      key={c.id}
-                                      direction="row"
-                                      spacing={0.5}
-                                      sx={{ alignItems: "center" }}
+                                    {c.ruolo === "capofamiglia" && (
+                                      <Tooltip title="Capofamiglia">
+                                        <CreditCardOutlinedIcon
+                                          sx={{
+                                            fontSize: 14,
+                                            color: "primary.main",
+                                          }}
+                                        />
+                                      </Tooltip>
+                                    )}
+                                    {(c.ruolo === "titolare" ||
+                                      (c.ruolo === "capofamiglia" &&
+                                        !n.componenti.some(
+                                          (p) => p.ruolo === "titolare",
+                                        ))) && (
+                                      <Tooltip title="Titolare tessera">
+                                        <HomeOutlinedIcon
+                                          sx={{
+                                            fontSize: 14,
+                                            color: "success.dark",
+                                          }}
+                                        />
+                                      </Tooltip>
+                                    )}
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                      sx={{ lineHeight: 1.3 }}
                                     >
-                                      {c.ruolo === "capofamiglia" && (
-                                        <Tooltip title="Capofamiglia">
-                                          <CreditCardOutlinedIcon
-                                            sx={{
-                                              fontSize: 14,
-                                              color: "primary.main",
-                                            }}
-                                          />
-                                        </Tooltip>
-                                      )}
-                                      {(c.ruolo === "titolare" ||
-                                        (c.ruolo === "capofamiglia" &&
-                                          !n.componenti.some(
-                                            (p) => p.ruolo === "titolare",
-                                          ))) && (
-                                        <Tooltip title="Titolare tessera">
-                                          <HomeOutlinedIcon
-                                            sx={{
-                                              fontSize: 14,
-                                              color: "success.dark",
-                                            }}
-                                          />
-                                        </Tooltip>
-                                      )}
-                                      <Typography
-                                        variant="caption"
-                                        color="text.secondary"
-                                        sx={{ lineHeight: 1.3 }}
-                                      >
-                                        {`${c.nome} ${c.cognome}`.trim()} -{" "}
-                                        {birthYear(c.data_nascita)} -{" "}
-                                        {c.nazionalita || "—"}
-                                      </Typography>
-                                    </Stack>
-                                  ))
-                                )}
-                              </Stack>
-                            )}
-                          </Box>
-                        </Stack>
+                                      {`${c.nome} ${c.cognome}`.trim()} -{" "}
+                                      {birthYear(c.data_nascita)} -{" "}
+                                      {c.nazionalita || "—"}
+                                    </Typography>
+                                  </Stack>
+                                ))
+                              )}
+                            </Stack>
+                          )}
+                        </Box>
                       </TableCell>
                       <TableCell>
                         {getCodiceFiscaleTesserato(n) ?? "—"}

@@ -817,12 +817,24 @@ export default function DettaglioUtente() {
                   sx={{ flex: 1, minWidth: 220 }}
                 />
                 <TextField
-                  label="Codice Fiscale del tesserato"
-                  value={cfTesserato}
-                  onChange={(e) => setCfTesserato(e.target.value.toUpperCase())}
-                  slotProps={{ htmlInput: { maxLength: 16 } }}
+                  label="Numero tessera"
+                  value={iscrizioni[0]?.numero_tessera ?? "—"}
+                  slotProps={{ htmlInput: { readOnly: true } }}
                   sx={{ flex: 1, minWidth: 220 }}
                 />
+                <TextField
+                  label="Scadenza"
+                  value={
+                    iscrizioni[0]?.data_scadenza
+                      ? new Date(
+                          iscrizioni[0].data_scadenza,
+                        ).toLocaleDateString("it-IT")
+                      : "—"
+                  }
+                  slotProps={{ htmlInput: { readOnly: true } }}
+                  sx={{ flex: 1, minWidth: 220 }}
+                />
+
                 <TextField
                   select
                   label="Zona"
@@ -853,6 +865,13 @@ export default function DettaglioUtente() {
               </Stack>
               <Stack direction="row" sx={{ gap: 2.2, flexWrap: "wrap" }}>
                 <TextField
+                  label="Codice Fiscale del tesserato"
+                  value={cfTesserato}
+                  onChange={(e) => setCfTesserato(e.target.value.toUpperCase())}
+                  slotProps={{ htmlInput: { maxLength: 16 } }}
+                  sx={{ flex: 1, minWidth: 220 }}
+                />
+                <TextField
                   label="Telefono"
                   value={telefono}
                   onChange={(e) => setTelefono(e.target.value)}
@@ -866,24 +885,6 @@ export default function DettaglioUtente() {
                 />
               </Stack>
               <Stack direction="row" sx={{ gap: 2.2, flexWrap: "wrap" }}>
-                <TextField
-                  label="Numero tessera"
-                  value={iscrizioni[0]?.numero_tessera ?? "—"}
-                  slotProps={{ htmlInput: { readOnly: true } }}
-                  sx={{ flex: 1, minWidth: 220 }}
-                />
-                <TextField
-                  label="Scadenza"
-                  value={
-                    iscrizioni[0]?.data_scadenza
-                      ? new Date(
-                          iscrizioni[0].data_scadenza,
-                        ).toLocaleDateString("it-IT")
-                      : "—"
-                  }
-                  slotProps={{ htmlInput: { readOnly: true } }}
-                  sx={{ flex: 1, minWidth: 220 }}
-                />
                 <Button
                   variant="outlined"
                   startIcon={<HistoryIcon />}
