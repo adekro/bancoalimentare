@@ -72,6 +72,12 @@ function calcFascia(
   return "65+";
 }
 
+function getYearFromIsoDate(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const year = Number.parseInt(value.slice(0, 4), 10);
+  return Number.isNaN(year) ? null : year;
+}
+
 // ---- Sub-componente form persona ----
 function SezionePersona({
   value,
@@ -221,11 +227,93 @@ export default function NuovoUtente() {
     setError("");
     setLoading(true);
 
+    const normalizedNumeroNucleoFamiliare = numeroNucleoFamiliare.trim();
+    const normalizedCf = cfTesserato.trim().toUpperCase();
+    const normalizedTessNumero = tessNumero.trim();
+    const tesseraYear = getYearFromIsoDate(tessDataScadenza || null);
+
+    if (normalizedTessNumero && !tesseraYear) {
+      setError(
+        "Per verificare il numero tessera devi indicare una data di scadenza valida.",
+      );
+      setLoading(false);
+      return;
+    }
+
+    if (normalizedNumeroNucleoFamiliare) {
+      const { data: duplicateNucleo, error: nucleoCheckErr } = await supabase
+        .from("nuclei")
+        .select("id")
+        .eq("numero_nucleo_familiare", normalizedNumeroNucleoFamiliare)
+        .limit(1)
+        .maybeSingle();
+
+      if (nucleoCheckErr) {
+        setError(nucleoCheckErr.message);
+        setLoading(false);
+        return;
+      }
+
+      if (duplicateNucleo) {
+        setError("Numero nucleo familiare gia presente.");
+        setLoading(false);
+        return;
+      }
+    }
+
+    if (normalizedCf) {
+      const { data: duplicateCf, error: cfCheckErr } = await supabase
+        .from("componenti")
+        .select("id")
+        .eq("codice_fiscale", normalizedCf)
+        .limit(1)
+        .maybeSingle();
+
+      if (cfCheckErr) {
+        setError(cfCheckErr.message);
+        setLoading(false);
+        return;
+      }
+
+      if (duplicateCf) {
+        setError("Codice fiscale gia presente su un altro nucleo.");
+        setLoading(false);
+        return;
+      }
+    }
+
+    if (normalizedTessNumero && tesseraYear) {
+      const startOfYear = `${tesseraYear}-01-01`;
+      const endOfYear = `${tesseraYear}-12-31`;
+      const { data: duplicateTessera, error: tesseraCheckErr } = await supabase
+        .from("iscrizioni")
+        .select("id")
+        .eq("numero_tessera", normalizedTessNumero)
+        .gte("data_scadenza", startOfYear)
+        .lte("data_scadenza", endOfYear)
+        .limit(1)
+        .maybeSingle();
+
+      if (tesseraCheckErr) {
+        setError(tesseraCheckErr.message);
+        setLoading(false);
+        return;
+      }
+
+      if (duplicateTessera) {
+        setError(
+          `Numero tessera gia presente per l'anno di scadenza ${tesseraYear}.`,
+        );
+        setLoading(false);
+        return;
+      }
+    }
+
     // 1. Insert nucleo
     const { data: nuclData, error: nuclErr } = await supabase
       .from("nuclei")
       .insert({
-        numero_nucleo_familiare: numeroNucleoFamiliare.trim() || null,
+        numero_nucleo_familiare: normalizedNumeroNucleoFamiliare || null,
         telefono: telefono.trim() || null,
         indirizzo: indirizzo.trim() || null,
         zona,
@@ -244,7 +332,7 @@ export default function NuovoUtente() {
     const nucleoId = nuclData.id;
 
     // 2. Insert componenti
-    const cfNorm = cfTesserato.trim().toUpperCase() || null;
+    const cfNorm = normalizedCf || null;
 
     const toInsert = [
       {
@@ -309,10 +397,10 @@ export default function NuovoUtente() {
     }
 
     // 3. Insert prima iscrizione (se compilata)
-    if (tessNumero.trim()) {
+    if (normalizedTessNumero) {
       const { error: iscrErr } = await supabase.from("iscrizioni").insert({
         nucleo_id: nucleoId,
-        numero_tessera: tessNumero.trim(),
+        numero_tessera: normalizedTessNumero,
         data_scadenza: tessDataScadenza || null,
       });
       if (iscrErr) {

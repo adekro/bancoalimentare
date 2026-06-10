@@ -108,6 +108,12 @@ function compareValues(
   });
 }
 
+function getYearFromIsoDate(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const year = Number.parseInt(value.slice(0, 4), 10);
+  return Number.isNaN(year) ? null : year;
+}
+
 /** Tenta di normalizzare DD/MM/YYYY → YYYY-MM-DD, altrimenti restituisce inalterato */
 function normalizzaData(s: string): string {
   const m = s.trim().match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
@@ -561,8 +567,11 @@ export default function DettaglioUtente() {
     setSaving(true);
 
     const latestIscrizione = iscrizioni[0] ?? null;
+    const normalizedNumeroNucleoFamiliare = numeroNucleoFamiliare.trim();
+    const normalizedCf = cfTesserato.trim().toUpperCase();
     const normalizedNumeroTessera = numeroTessera.trim();
     const normalizedScadenzaTessera = scadenzaTessera || null;
+    const scadenzaYear = getYearFromIsoDate(normalizedScadenzaTessera);
     const numeroTesseraChanged =
       normalizedNumeroTessera !== (latestIscrizione?.numero_tessera ?? "");
     const scadenzaTesseraChanged =
@@ -571,11 +580,91 @@ export default function DettaglioUtente() {
       Boolean(normalizedNumeroTessera) &&
       (!latestIscrizione || numeroTesseraChanged || scadenzaTesseraChanged);
 
+    if (normalizedNumeroTessera && !scadenzaYear) {
+      setError(
+        "Per verificare il numero tessera devi indicare una data di scadenza valida.",
+      );
+      setSaving(false);
+      return;
+    }
+
+    if (normalizedNumeroNucleoFamiliare) {
+      const { data: duplicateNucleo, error: nucleoCheckErr } = await supabase
+        .from("nuclei")
+        .select("id")
+        .eq("numero_nucleo_familiare", normalizedNumeroNucleoFamiliare)
+        .neq("id", id)
+        .limit(1)
+        .maybeSingle();
+
+      if (nucleoCheckErr) {
+        setError(nucleoCheckErr.message);
+        setSaving(false);
+        return;
+      }
+
+      if (duplicateNucleo) {
+        setError("Numero nucleo familiare gia presente.");
+        setSaving(false);
+        return;
+      }
+    }
+
+    if (normalizedCf) {
+      const { data: duplicateCf, error: cfCheckErr } = await supabase
+        .from("componenti")
+        .select("id, nucleo_id")
+        .eq("codice_fiscale", normalizedCf)
+        .neq("nucleo_id", id)
+        .limit(1)
+        .maybeSingle();
+
+      if (cfCheckErr) {
+        setError(cfCheckErr.message);
+        setSaving(false);
+        return;
+      }
+
+      if (duplicateCf) {
+        setError("Codice fiscale gia presente su un altro nucleo.");
+        setSaving(false);
+        return;
+      }
+    }
+
+    if (normalizedNumeroTessera && scadenzaYear) {
+      const startOfYear = `${scadenzaYear}-01-01`;
+      const endOfYear = `${scadenzaYear}-12-31`;
+      const { data: duplicateTessera, error: tesseraCheckErr } = await supabase
+        .from("iscrizioni")
+        .select("id, nucleo_id")
+        .eq("numero_tessera", normalizedNumeroTessera)
+        .neq("nucleo_id", id)
+        .gte("data_scadenza", startOfYear)
+        .lte("data_scadenza", endOfYear)
+        .limit(1)
+        .maybeSingle();
+
+      if (tesseraCheckErr) {
+        setError(tesseraCheckErr.message);
+        setSaving(false);
+        return;
+      }
+
+      if (duplicateTessera) {
+        setError(
+          `Numero tessera gia presente per l'anno di scadenza ${scadenzaYear}.`,
+        );
+        setSaving(false);
+        return;
+      }
+    }
+
     // 1. Aggiorna nucleo
     const { error: nuclErr } = await supabase
       .from("nuclei")
       .update({
-        numero_nucleo_familiare: numeroNucleoFamiliare.trim() || null,
+        numero_nucleo_familiare: normalizedNumeroNucleoFamiliare || null,
         codice_fiscale: null,
         telefono: telefono.trim() || null,
         indirizzo: indirizzo.trim() || null,
@@ -603,7 +692,7 @@ export default function DettaglioUtente() {
       return;
     }
 
-    const cfNorm = cfTesserato.trim().toUpperCase() || null;
+    const cfNorm = normalizedCf || null;
 
     const toInsert = [
       {

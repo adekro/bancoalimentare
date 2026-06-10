@@ -170,6 +170,12 @@ function formatDate(value: string | null | undefined) {
   return date.toLocaleDateString("it-IT");
 }
 
+function getYearFromIsoDate(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const year = Number.parseInt(value.slice(0, 4), 10);
+  return Number.isNaN(year) ? null : year;
+}
+
 function getScadenzaTone(value: string | null | undefined) {
   if (!value) return "text.secondary";
   const now = new Date();
@@ -616,6 +622,13 @@ export default function ListaUtenti() {
           .filter(Boolean),
       ),
     );
+    const numeroNucleoValues = Array.from(
+      new Set(
+        validImportNuclei
+          .map((n) => n.numeroNucleoFamiliare?.trim() ?? "")
+          .filter(Boolean),
+      ),
+    );
     const tessValues = Array.from(
       new Set(
         validImportNuclei
@@ -625,7 +638,20 @@ export default function ListaUtenti() {
     );
 
     const existingCf = new Set<string>();
+    const existingNumeroNucleo = new Set<string>();
     const existingTessere = new Set<string>();
+
+    if (numeroNucleoValues.length > 0) {
+      const { data } = await supabase
+        .from("nuclei")
+        .select("numero_nucleo_familiare")
+        .in("numero_nucleo_familiare", numeroNucleoValues);
+      data?.forEach((row) => {
+        if (row.numero_nucleo_familiare) {
+          existingNumeroNucleo.add(String(row.numero_nucleo_familiare).trim());
+        }
+      });
+    }
 
     if (cfValues.length > 0) {
       const { data } = await supabase
@@ -641,14 +667,20 @@ export default function ListaUtenti() {
     if (tessValues.length > 0) {
       const { data } = await supabase
         .from("iscrizioni")
-        .select("numero_tessera")
+        .select("numero_tessera, data_scadenza")
         .in("numero_tessera", tessValues);
       data?.forEach((row) => {
-        if (row.numero_tessera)
-          existingTessere.add(String(row.numero_tessera).trim());
+        const numeroTessera = row.numero_tessera
+          ? String(row.numero_tessera).trim()
+          : "";
+        const year = getYearFromIsoDate(row.data_scadenza);
+        if (numeroTessera && year) {
+          existingTessere.add(`${numeroTessera}::${year}`);
+        }
       });
     }
 
+    const seenNumeroNucleoInFile = new Set<string>();
     const seenCfInFile = new Set<string>();
     const seenTessInFile = new Set<string>();
 
@@ -662,8 +694,24 @@ export default function ListaUtenti() {
         );
         continue;
       }
+      const numeroNucleo = nucleo.numeroNucleoFamiliare?.trim() ?? "";
       const cf = nucleo.codiceFiscale?.toUpperCase().trim() ?? "";
       const tessera = nucleo.tesseraNumero?.trim() ?? "";
+      const tesseraYear = getYearFromIsoDate(nucleo.tesseraScadenza);
+      const tesseraKey =
+        tessera && tesseraYear ? `${tessera}::${tesseraYear}` : "";
+
+      if (
+        numeroNucleo &&
+        (existingNumeroNucleo.has(numeroNucleo) ||
+          seenNumeroNucleoInFile.has(numeroNucleo))
+      ) {
+        saltati++;
+        dettagli.push(
+          `Saltato blocco riga ${nucleo.sourceRowStart}: numero nucleo familiare gia presente (${numeroNucleo}).`,
+        );
+        continue;
+      }
 
       if (cf && (existingCf.has(cf) || seenCfInFile.has(cf))) {
         saltati++;
@@ -673,13 +721,21 @@ export default function ListaUtenti() {
         continue;
       }
 
+      if (tessera && !tesseraYear) {
+        saltati++;
+        dettagli.push(
+          `Saltato blocco riga ${nucleo.sourceRowStart}: numero tessera presente senza scadenza valida.`,
+        );
+        continue;
+      }
+
       if (
-        tessera &&
-        (existingTessere.has(tessera) || seenTessInFile.has(tessera))
+        tesseraKey &&
+        (existingTessere.has(tesseraKey) || seenTessInFile.has(tesseraKey))
       ) {
         saltati++;
         dettagli.push(
-          `Saltato blocco riga ${nucleo.sourceRowStart}: tessera gia presente (${tessera}).`,
+          `Saltato blocco riga ${nucleo.sourceRowStart}: tessera gia presente per l'anno ${tesseraYear} (${tessera}).`,
         );
         continue;
       }
@@ -753,13 +809,17 @@ export default function ListaUtenti() {
       }
 
       importati++;
+      if (numeroNucleo) {
+        existingNumeroNucleo.add(numeroNucleo);
+        seenNumeroNucleoInFile.add(numeroNucleo);
+      }
       if (cf) {
         existingCf.add(cf);
         seenCfInFile.add(cf);
       }
-      if (tessera) {
-        existingTessere.add(tessera);
-        seenTessInFile.add(tessera);
+      if (tesseraKey) {
+        existingTessere.add(tesseraKey);
+        seenTessInFile.add(tesseraKey);
       }
     }
 
