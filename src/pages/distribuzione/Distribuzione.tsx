@@ -40,6 +40,7 @@ import StoricoDistribuzioniDialog from "@/components/common/StoricoDistribuzioni
 
 const STATO_FILTER: Array<{ value: StatoNucleo | ""; label: string }> = [
   { value: "", label: "Tutti gli stati" },
+  { value: "bozza", label: "Bozza" },
   { value: "verde", label: "Attivo" },
   { value: "nero", label: "Non rinnovato" },
   { value: "rosso", label: "Sospeso" },
@@ -66,6 +67,7 @@ type SbloccoDialogState = {
 };
 
 function renderStato(stato: StatoNucleo) {
+  if (stato === "bozza") return { label: "Bozza", color: "default" as const };
   if (stato === "verde") return { label: "Attivo", color: "success" as const };
   if (stato === "nero")
     return { label: "Non rinnovato", color: "warning" as const };
