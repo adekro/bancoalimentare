@@ -57,6 +57,7 @@ import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/api/supabase";
 import type { StatoNucleo } from "@/components/common/StatusChip";
+import { parsePastedPersoneFromExcel } from "../../utils/personaExcelPaste";
 import {
   parseNucleiFromExcel,
   type ImportNucleo,
@@ -281,6 +282,8 @@ export default function ListaUtenti() {
   const [statoMenu, setStatoMenu] = useState<StatoMenuAnchor | null>(null);
   const [statoUpdatingId, setStatoUpdatingId] = useState<string | null>(null);
   const [expandedNucleoId, setExpandedNucleoId] = useState<string | null>(null);
+  const [excelOpen, setExcelOpen] = useState(false);
+  const [excelText, setExcelText] = useState("");
   const [importOpen, setImportOpen] = useState(false);
   const [importFileName, setImportFileName] = useState("");
   const [importReading, setImportReading] = useState(false);
@@ -539,9 +542,22 @@ export default function ListaUtenti() {
 
   const handleAzioneCopiaIncolla = () => {
     closeAzioniMenu();
-    setSuccessMsg(
-      "La funzione di import rapido e disponibile nella pagina di dettaglio nucleo.",
-    );
+    setExcelOpen(true);
+    setExcelText("");
+  };
+
+  const handleImportaDaCopiaIncolla = () => {
+    const persone = parsePastedPersoneFromExcel(excelText);
+    if (persone.length === 0) {
+      setError("Nessuna persona riconosciuta nel testo incollato.");
+      return;
+    }
+
+    setExcelOpen(false);
+    setExcelText("");
+    navigate("/utenti/nuovo", {
+      state: { excelPersone: persone },
+    });
   };
 
   const resetImportState = () => {
@@ -1592,6 +1608,57 @@ export default function ListaUtenti() {
             ) : (
               "Conferma rinnovo"
             )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={excelOpen}
+        onClose={() => setExcelOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>Importa componenti da Excel</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Copia le celle da Excel e incollale qui sotto. Il formato atteso è:
+            <br />
+            <strong>
+              Cognome [TAB] Nome [TAB] Data nascita [TAB] Nazionalità
+            </strong>
+            <br />
+            oppure, copiando direttamente dal file FEAD 2026, vengono rilevate
+            automaticamente tutte le colonne (Nazione di nascita, Nazionalità,
+            Sesso, Invalido, Paesi Terzi). La data può essere nel formato
+            GG/MM/AAAA oppure AAAA-MM-GG. Se la prima riga è un'intestazione
+            viene ignorata automaticamente.
+          </Typography>
+          <TextField
+            multiline
+            rows={8}
+            fullWidth
+            placeholder={
+              "Rossi\tMario\t01/01/1970\titaliana\nRossi\tMaria\t15/06/1995\titaliana"
+            }
+            value={excelText}
+            onChange={(e) => setExcelText(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setExcelOpen(false);
+              setExcelText("");
+            }}
+          >
+            Annulla
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleImportaDaCopiaIncolla}
+            disabled={!excelText.trim()}
+          >
+            Importa
           </Button>
         </DialogActions>
       </Dialog>

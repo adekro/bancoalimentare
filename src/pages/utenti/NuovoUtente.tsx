@@ -22,10 +22,11 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
 import Groups2OutlinedIcon from "@mui/icons-material/Groups2Outlined";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/api/supabase";
 import NationalityAutocomplete from "@/components/common/NationalityAutocomplete";
 import type { StatoNucleo } from "@/components/common/StatusChip";
+import type { PastedPersona } from "../../utils/personaExcelPaste";
 
 const ZONE = ["Pombio", "Duomo", "Medassino", "San Rocco"];
 const STATI: { value: StatoNucleo; label: string }[] = [
@@ -182,6 +183,7 @@ function SezionePersona({
 // ---- Pagina principale ----
 export default function NuovoUtente() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [cfTesserato, setCfTesserato] = useState("");
   const [numeroNucleoFamiliare, setNumeroNucleoFamiliare] = useState("");
   const [zona, setZona] = useState("");
@@ -198,6 +200,20 @@ export default function NuovoUtente() {
   const [tessDataScadenza, setTessDataScadenza] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const importedPeople = (
+      location.state as { excelPersone?: PastedPersona[] } | null
+    )?.excelPersone;
+    if (!importedPeople || importedPeople.length === 0) return;
+
+    if (importedPeople[0]) {
+      setCapofamiglia(importedPeople[0]);
+      setComponentiExtra(importedPeople.slice(1));
+    }
+
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.pathname, location.state, navigate]);
 
   useEffect(() => {
     if (stessoSoggetto) {
