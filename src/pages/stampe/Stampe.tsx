@@ -660,10 +660,8 @@ export default function Stampe() {
         >
           <Tab label="Lista Nuclei" />
           <Tab label="Ultime Distribuzioni" />
-          <Tab label="Consegne giornaliere per settore" />
           <Tab label="Report FSE+" />
           <Tab label="Esporta CSV" />
-          <Tab label="Magazzino" />
           <Tab label="Storico Nucleo" />
         </Tabs>
       </Paper>
@@ -990,164 +988,8 @@ export default function Stampe() {
             </Box>
           )}
 
-          {/* ═══════════════ TAB 2 — Consegne Giornaliere per Settore ═══════════════ */}
-          {tab === 2 && (
-            <Box>
-              <Box
-                className="no-print"
-                sx={{
-                  display: "flex",
-                  gap: 2,
-                  mb: 2,
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                }}
-              >
-                <FormControl size="small" sx={{ minWidth: 180 }}>
-                  <InputLabel>Settore (zona)</InputLabel>
-                  <Select
-                    value={filterZona}
-                    label="Settore (zona)"
-                    onChange={(e) => setFilterZona(e.target.value)}
-                  >
-                    <MenuItem value="Tutte">Tutte</MenuItem>
-                    {ZONE.map((z) => (
-                      <MenuItem key={z} value={z}>
-                        {z}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <TextField
-                  label="Data da"
-                  type="date"
-                  size="small"
-                  value={filterDataDa}
-                  onChange={(e) => setFilterDataDa(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                />
-                <TextField
-                  label="Data a"
-                  type="date"
-                  size="small"
-                  value={filterDataA}
-                  onChange={(e) => setFilterDataA(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                />
-                <FormControl size="small" sx={{ minWidth: 170 }}>
-                  <InputLabel>Ordina per</InputLabel>
-                  <Select
-                    value={consegneSortBy}
-                    label="Ordina per"
-                    onChange={(e) =>
-                      setConsegneSortBy(e.target.value as typeof consegneSortBy)
-                    }
-                  >
-                    <MenuItem value="zona">Settore</MenuItem>
-                    <MenuItem value="data">Data</MenuItem>
-                    <MenuItem value="titolare">Titolare</MenuItem>
-                    <MenuItem value="tessera">N° Tessera</MenuItem>
-                    <MenuItem value="pacchi">Pacchi</MenuItem>
-                  </Select>
-                </FormControl>
-                <FormControl size="small" sx={{ minWidth: 140 }}>
-                  <InputLabel>Direzione</InputLabel>
-                  <Select
-                    value={consegneSortDir}
-                    label="Direzione"
-                    onChange={(e) =>
-                      setConsegneSortDir(e.target.value as SortDirection)
-                    }
-                  >
-                    <MenuItem value="asc">Crescente</MenuItem>
-                    <MenuItem value="desc">Decrescente</MenuItem>
-                  </Select>
-                </FormControl>
-                <Typography variant="body2" color="text.secondary">
-                  {consegneSettoreRows.length} consegne
-                </Typography>
-                <Box sx={{ flexGrow: 1 }} />
-                <Button
-                  variant="outlined"
-                  startIcon={<DownloadIcon />}
-                  onClick={esportaConsegneSettoreXML}
-                >
-                  Export XML (.xls)
-                </Button>
-                <Button
-                  variant="contained"
-                  startIcon={<PrintIcon />}
-                  onClick={() => window.print()}
-                >
-                  Stampa
-                </Button>
-              </Box>
-
-              {loadingDistribuzioni ? (
-                <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
-                  <CircularProgress />
-                </Box>
-              ) : (
-                <TableContainer component={Paper} elevation={1}>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow sx={{ backgroundColor: "primary.main" }}>
-                        {[
-                          "Data",
-                          "Settore",
-                          "Titolare Tessera",
-                          "N° Tessera",
-                          "CF Nucleo",
-                          "Pacchi",
-                          "Centro",
-                        ].map((h) => (
-                          <TableCell
-                            key={h}
-                            sx={{ color: "white", fontWeight: 700 }}
-                          >
-                            {h}
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {consegneSettoreRows.map((r, i) => (
-                        <TableRow
-                          key={r.distribuzioneId}
-                          sx={{
-                            backgroundColor:
-                              i % 2 === 0 ? "transparent" : "action.hover",
-                          }}
-                        >
-                          <TableCell>{fmtData(r.data)}</TableCell>
-                          <TableCell>{r.zona}</TableCell>
-                          <TableCell>{r.titolare}</TableCell>
-                          <TableCell>{r.numeroTessera ?? "—"}</TableCell>
-                          <TableCell>{r.codiceFiscale ?? "—"}</TableCell>
-                          <TableCell>{r.numeroPacchi ?? "—"}</TableCell>
-                          <TableCell>{r.centro}</TableCell>
-                        </TableRow>
-                      ))}
-                      {consegneSettoreRows.length === 0 && (
-                        <TableRow>
-                          <TableCell
-                            colSpan={7}
-                            align="center"
-                            sx={{ py: 4, color: "text.secondary" }}
-                          >
-                            Nessuna consegna trovata
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              )}
-            </Box>
-          )}
-
           {/* ═══════════════ TAB 1 — Report FSE+ ═══════════════ */}
-          {tab === 3 && (
+          {tab === 2 && (
             <Box>
               <Box
                 sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}
@@ -1367,7 +1209,7 @@ export default function Stampe() {
           )}
 
           {/* ═══════════════ TAB 2 — Esporta CSV ═══════════════ */}
-          {tab === 4 && (
+          {tab === 3 && (
             <Box>
               <Paper elevation={1} sx={{ p: 3, maxWidth: 600 }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
@@ -1436,107 +1278,8 @@ export default function Stampe() {
               </Paper>
             </Box>
           )}
-
-          {/* ═══════════════ TAB 3 — Magazzino ═══════════════ */}
-          {tab === 5 && (
-            <Box>
-              <Box
-                sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}
-                className="no-print"
-              >
-                <Button
-                  variant="outlined"
-                  startIcon={<PrintIcon />}
-                  onClick={() => window.print()}
-                >
-                  Stampa
-                </Button>
-              </Box>
-
-              <Typography
-                variant="h6"
-                sx={{
-                  mb: 2,
-                  display: "none",
-                  "@media print": { display: "block" },
-                }}
-              >
-                Riepilogo Magazzino — {new Date().toLocaleDateString("it-IT")}
-              </Typography>
-
-              {loadingMag ? (
-                <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
-                  <CircularProgress />
-                </Box>
-              ) : giacenze.length === 0 ? (
-                <Alert severity="info">
-                  Nessun articolo in magazzino. Il modulo Magazzino (Fase 5) non
-                  è ancora stato configurato.
-                </Alert>
-              ) : (
-                FONDI.map((fondo) => {
-                  const righe = giacenze.filter((g) => g.fondo === fondo);
-                  if (righe.length === 0) return null;
-                  return (
-                    <Box key={fondo} sx={{ mb: 4 }}>
-                      <Typography
-                        variant="subtitle1"
-                        sx={{ fontWeight: 700, mb: 1 }}
-                      >
-                        Fondo: {fondo}
-                      </Typography>
-                      <TableContainer component={Paper} elevation={1}>
-                        <Table size="small">
-                          <TableHead>
-                            <TableRow sx={{ backgroundColor: "grey.100" }}>
-                              <TableCell sx={{ fontWeight: 700 }}>
-                                Articolo
-                              </TableCell>
-                              <TableCell sx={{ fontWeight: 700 }}>
-                                Unità
-                              </TableCell>
-                              <TableCell align="right" sx={{ fontWeight: 700 }}>
-                                Giacenza
-                              </TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {righe.map((r) => (
-                              <TableRow
-                                key={r.id}
-                                sx={{
-                                  backgroundColor:
-                                    r.giacenza < 0
-                                      ? "rgba(198,40,40,0.06)"
-                                      : "transparent",
-                                }}
-                              >
-                                <TableCell>{r.nome}</TableCell>
-                                <TableCell>{r.unita_misura}</TableCell>
-                                <TableCell
-                                  align="right"
-                                  sx={{
-                                    fontWeight: 600,
-                                    color:
-                                      r.giacenza < 0 ? "error.main" : "inherit",
-                                  }}
-                                >
-                                  {r.giacenza}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </TableContainer>
-                    </Box>
-                  );
-                })
-              )}
-            </Box>
-          )}
-
           {/* ═══════════════ TAB 4 — Storico Nucleo ═══════════════ */}
-          {tab === 6 && (
+          {tab === 4 && (
             <Box>
               <Box sx={{ mb: 3 }} className="no-print">
                 <Autocomplete
