@@ -375,6 +375,9 @@ export default function DettaglioUtente() {
     note: "",
   });
   const [savingIscrizione, setSavingIscrizione] = useState(false);
+  const [deletingIscrizioneId, setDeletingIscrizioneId] = useState<
+    string | null
+  >(null);
   const [storicoSortBy, setStoricoSortBy] =
     useState<StoricoIscrizioniSortKey>("registrataIl");
   const [storicoSortDir, setStoricoSortDir] = useState<SortDirection>("desc");
@@ -831,6 +834,23 @@ export default function DettaglioUtente() {
     });
   };
 
+  const handleDeleteIscrizione = async (iscrizioneId: string) => {
+    setDeletingIscrizioneId(iscrizioneId);
+    const { error: deleteErr } = await supabase
+      .from("iscrizioni")
+      .delete()
+      .eq("id", iscrizioneId);
+
+    setDeletingIscrizioneId(null);
+
+    if (deleteErr) {
+      setError(deleteErr.message);
+      return;
+    }
+
+    setIscrizioni((prev) => prev.filter((item) => item.id !== iscrizioneId));
+  };
+
   if (pageLoading) {
     return (
       <Box
@@ -1254,6 +1274,20 @@ export default function DettaglioUtente() {
                       </TableSortLabel>
                     </TableCell>
                   ))}
+                  <TableCell align="right">
+                    <Box
+                      component="span"
+                      sx={{
+                        fontWeight: 700,
+                        fontSize: "0.75rem",
+                        textTransform: "uppercase",
+                        letterSpacing: 0.5,
+                        color: "text.secondary",
+                      }}
+                    >
+                      Azioni
+                    </Box>
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -1287,6 +1321,24 @@ export default function DettaglioUtente() {
                       sx={{ color: "text.secondary", fontSize: "0.8rem" }}
                     >
                       {new Date(isc.created_at).toLocaleDateString("it-IT")}
+                    </TableCell>
+                    <TableCell align="right">
+                      <Tooltip title="Elimina riga">
+                        <span>
+                          <IconButton
+                            size="small"
+                            color="error"
+                            disabled={deletingIscrizioneId === isc.id}
+                            onClick={() => handleDeleteIscrizione(isc.id)}
+                          >
+                            {deletingIscrizioneId === isc.id ? (
+                              <CircularProgress size={18} color="inherit" />
+                            ) : (
+                              <DeleteIcon fontSize="small" />
+                            )}
+                          </IconButton>
+                        </span>
+                      </Tooltip>
                     </TableCell>
                   </TableRow>
                 ))}
