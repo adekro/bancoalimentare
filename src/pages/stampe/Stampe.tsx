@@ -40,6 +40,7 @@ type Componente = {
   codice_fiscale: string | null;
   data_nascita: string | null;
   nazionalita: string | null;
+  nazione_nascita: string | null;
   sesso: string | null;
   paesi_terzi_ue: boolean | null;
   invalido: boolean | null;
@@ -55,7 +56,11 @@ type Iscrizione = {
 
 type Nucleo = {
   id: string;
+  numero_nucleo_familiare: string | null;
+  numero_componenti: number | null;
   codice_fiscale: string | null;
+  telefono: string | null;
+  indirizzo: string | null;
   zona: string;
   stato: "verde" | "nero" | "rosso";
   archiviato: boolean;
@@ -201,9 +206,104 @@ const NUCLEI_COLUMNS_CONFIG = [
   },
   {
     id: "n_componenti",
-    header: "N° Componenti",
+    header: "N° Componenti (calcolato)",
     value: (n: Nucleo) => n.componenti.length,
     exportValue: (n: Nucleo) => n.componenti.length,
+  },
+  {
+    id: "numero_nucleo",
+    header: "N° Nucleo",
+    value: (n: Nucleo) => n.numero_nucleo_familiare ?? "—",
+    exportValue: (n: Nucleo) => n.numero_nucleo_familiare ?? "",
+  },
+  {
+    id: "numero_componenti_db",
+    header: "N° Componenti (db)",
+    value: (n: Nucleo) => n.numero_componenti ?? "—",
+    exportValue: (n: Nucleo) => n.numero_componenti ?? "",
+  },
+  {
+    id: "telefono",
+    header: "Telefono",
+    value: (n: Nucleo) => n.telefono ?? "—",
+    exportValue: (n: Nucleo) => n.telefono ?? "",
+  },
+  {
+    id: "indirizzo",
+    header: "Indirizzo",
+    value: (n: Nucleo) => n.indirizzo ?? "—",
+    exportValue: (n: Nucleo) => n.indirizzo ?? "",
+  },
+  {
+    id: "cognome_p",
+    header: "Cognome",
+    value: (n: Nucleo) => getTitolare(n.componenti)?.cognome ?? "—",
+    exportValue: (n: Nucleo) => getTitolare(n.componenti)?.cognome ?? "",
+  },
+  {
+    id: "nome_p",
+    header: "Nome",
+    value: (n: Nucleo) => getTitolare(n.componenti)?.nome ?? "—",
+    exportValue: (n: Nucleo) => getTitolare(n.componenti)?.nome ?? "",
+  },
+  {
+    id: "cf_p",
+    header: "CF Persona",
+    value: (n: Nucleo) => getTitolare(n.componenti)?.codice_fiscale ?? "—",
+    exportValue: (n: Nucleo) => getTitolare(n.componenti)?.codice_fiscale ?? "",
+  },
+  {
+    id: "data_nascita_p",
+    header: "Data Nascita",
+    value: (n: Nucleo) => fmtData(getTitolare(n.componenti)?.data_nascita),
+    exportValue: (n: Nucleo) => getTitolare(n.componenti)?.data_nascita ?? "",
+  },
+  {
+    id: "nazione_nascita_p",
+    header: "Nazione Nascita",
+    value: (n: Nucleo) => getTitolare(n.componenti)?.nazione_nascita ?? "—",
+    exportValue: (n: Nucleo) => getTitolare(n.componenti)?.nazione_nascita ?? "",
+  },
+  {
+    id: "nazionalita_p",
+    header: "Nazionalità",
+    value: (n: Nucleo) => getTitolare(n.componenti)?.nazionalita ?? "—",
+    exportValue: (n: Nucleo) => getTitolare(n.componenti)?.nazionalita ?? "",
+  },
+  {
+    id: "sesso_p",
+    header: "Sesso",
+    value: (n: Nucleo) => getTitolare(n.componenti)?.sesso ?? "—",
+    exportValue: (n: Nucleo) => getTitolare(n.componenti)?.sesso ?? "",
+  },
+  {
+    id: "paesi_terzi_p",
+    header: "Extra-UE",
+    value: (n: Nucleo) =>
+      getTitolare(n.componenti)?.paesi_terzi_ue ? "SI" : "NO",
+    exportValue: (n: Nucleo) =>
+      getTitolare(n.componenti)?.paesi_terzi_ue ? "SI" : "NO",
+  },
+  {
+    id: "invalido_p",
+    header: "Invalido",
+    value: (n: Nucleo) => (getTitolare(n.componenti)?.invalido ? "SI" : "NO"),
+    exportValue: (n: Nucleo) => (getTitolare(n.componenti)?.invalido ? "SI" : "NO"),
+  },
+  {
+    id: "fascia_eta_p",
+    header: "Fascia Età",
+    value: (n: Nucleo) => {
+      const t = getTitolare(n.componenti);
+      if (!t) return "—";
+      const f = t.fascia_eta ?? calcFascia(t.data_nascita);
+      return FASCIA_LABEL[f] ?? f;
+    },
+    exportValue: (n: Nucleo) => {
+      const t = getTitolare(n.componenti);
+      if (!t) return "";
+      return t.fascia_eta ?? calcFascia(t.data_nascita);
+    },
   },
 ];
 
@@ -327,7 +427,7 @@ export default function Stampe() {
       const { data, error } = await supabase
         .from("nuclei")
         .select(
-          "id, codice_fiscale, zona, stato, archiviato, " +
+          "id, numero_nucleo_familiare, numero_componenti, codice_fiscale, telefono, indirizzo, zona, stato, archiviato, " +
             "componenti(*), " +
             "iscrizioni(id, numero_tessera, data_inizio, data_scadenza)",
         )
