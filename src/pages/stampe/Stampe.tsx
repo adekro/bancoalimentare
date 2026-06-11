@@ -40,6 +40,7 @@ type Componente = {
   codice_fiscale: string | null;
   data_nascita: string | null;
   nazionalita: string | null;
+  nazione_nascita: string | null;
   sesso: string | null;
   paesi_terzi_ue: boolean | null;
   invalido: boolean | null;
@@ -55,7 +56,11 @@ type Iscrizione = {
 
 type Nucleo = {
   id: string;
+  numero_nucleo_familiare: string | null;
+  numero_componenti: number | null;
   codice_fiscale: string | null;
+  telefono: string | null;
+  indirizzo: string | null;
   zona: string;
   stato: "verde" | "nero" | "rosso";
   archiviato: boolean;
@@ -154,6 +159,154 @@ const FASCIA_LABEL: Record<string, string> = {
 };
 const FASCE_ORDINE = ["0-17", "18-29", "30-64", "65+"];
 
+const NUCLEI_COLUMNS_CONFIG = [
+  {
+    id: "tessera",
+    header: "N° Tessera",
+    value: (n: Nucleo) => getUltimaIscrizione(n.iscrizioni)?.numero_tessera ?? "—",
+    exportValue: (n: Nucleo) =>
+      getUltimaIscrizione(n.iscrizioni)?.numero_tessera ?? "",
+  },
+  {
+    id: "cf",
+    header: "Codice Fiscale",
+    value: (n: Nucleo) => n.codice_fiscale ?? "—",
+    exportValue: (n: Nucleo) => n.codice_fiscale ?? "",
+  },
+  {
+    id: "titolare",
+    header: "Nominativo",
+    value: (n: Nucleo) => {
+      const t = getTitolare(n.componenti);
+      return t ? `${t.cognome} ${t.nome}` : "—";
+    },
+    exportValue: (n: Nucleo) => {
+      const t = getTitolare(n.componenti);
+      return t ? `${t.cognome} ${t.nome}` : "";
+    },
+  },
+  {
+    id: "zona",
+    header: "Zona",
+    value: (n: Nucleo) => n.zona,
+    exportValue: (n: Nucleo) => n.zona,
+  },
+  {
+    id: "stato",
+    header: "Stato",
+    value: (n: Nucleo) => n.stato,
+    exportValue: (n: Nucleo) => n.stato,
+  },
+  {
+    id: "scadenza",
+    header: "Scadenza",
+    value: (n: Nucleo) => fmtData(getUltimaIscrizione(n.iscrizioni)?.data_scadenza),
+    exportValue: (n: Nucleo) =>
+      getUltimaIscrizione(n.iscrizioni)?.data_scadenza ?? "",
+  },
+  {
+    id: "n_componenti",
+    header: "N° Componenti (calcolato)",
+    value: (n: Nucleo) => n.componenti.length,
+    exportValue: (n: Nucleo) => n.componenti.length,
+  },
+  {
+    id: "numero_nucleo",
+    header: "N° Nucleo",
+    value: (n: Nucleo) => n.numero_nucleo_familiare ?? "—",
+    exportValue: (n: Nucleo) => n.numero_nucleo_familiare ?? "",
+  },
+  {
+    id: "numero_componenti_db",
+    header: "N° Componenti (db)",
+    value: (n: Nucleo) => n.numero_componenti ?? "—",
+    exportValue: (n: Nucleo) => n.numero_componenti ?? "",
+  },
+  {
+    id: "telefono",
+    header: "Telefono",
+    value: (n: Nucleo) => n.telefono ?? "—",
+    exportValue: (n: Nucleo) => n.telefono ?? "",
+  },
+  {
+    id: "indirizzo",
+    header: "Indirizzo",
+    value: (n: Nucleo) => n.indirizzo ?? "—",
+    exportValue: (n: Nucleo) => n.indirizzo ?? "",
+  },
+  {
+    id: "cognome_p",
+    header: "Cognome",
+    value: (n: Nucleo) => getTitolare(n.componenti)?.cognome ?? "—",
+    exportValue: (n: Nucleo) => getTitolare(n.componenti)?.cognome ?? "",
+  },
+  {
+    id: "nome_p",
+    header: "Nome",
+    value: (n: Nucleo) => getTitolare(n.componenti)?.nome ?? "—",
+    exportValue: (n: Nucleo) => getTitolare(n.componenti)?.nome ?? "",
+  },
+  {
+    id: "cf_p",
+    header: "CF Persona",
+    value: (n: Nucleo) => getTitolare(n.componenti)?.codice_fiscale ?? "—",
+    exportValue: (n: Nucleo) => getTitolare(n.componenti)?.codice_fiscale ?? "",
+  },
+  {
+    id: "data_nascita_p",
+    header: "Data Nascita",
+    value: (n: Nucleo) => fmtData(getTitolare(n.componenti)?.data_nascita),
+    exportValue: (n: Nucleo) => getTitolare(n.componenti)?.data_nascita ?? "",
+  },
+  {
+    id: "nazione_nascita_p",
+    header: "Nazione Nascita",
+    value: (n: Nucleo) => getTitolare(n.componenti)?.nazione_nascita ?? "—",
+    exportValue: (n: Nucleo) => getTitolare(n.componenti)?.nazione_nascita ?? "",
+  },
+  {
+    id: "nazionalita_p",
+    header: "Nazionalità",
+    value: (n: Nucleo) => getTitolare(n.componenti)?.nazionalita ?? "—",
+    exportValue: (n: Nucleo) => getTitolare(n.componenti)?.nazionalita ?? "",
+  },
+  {
+    id: "sesso_p",
+    header: "Sesso",
+    value: (n: Nucleo) => getTitolare(n.componenti)?.sesso ?? "—",
+    exportValue: (n: Nucleo) => getTitolare(n.componenti)?.sesso ?? "",
+  },
+  {
+    id: "paesi_terzi_p",
+    header: "Extra-UE",
+    value: (n: Nucleo) =>
+      getTitolare(n.componenti)?.paesi_terzi_ue ? "SI" : "NO",
+    exportValue: (n: Nucleo) =>
+      getTitolare(n.componenti)?.paesi_terzi_ue ? "SI" : "NO",
+  },
+  {
+    id: "invalido_p",
+    header: "Invalido",
+    value: (n: Nucleo) => (getTitolare(n.componenti)?.invalido ? "SI" : "NO"),
+    exportValue: (n: Nucleo) => (getTitolare(n.componenti)?.invalido ? "SI" : "NO"),
+  },
+  {
+    id: "fascia_eta_p",
+    header: "Fascia Età",
+    value: (n: Nucleo) => {
+      const t = getTitolare(n.componenti);
+      if (!t) return "—";
+      const f = t.fascia_eta ?? calcFascia(t.data_nascita);
+      return FASCIA_LABEL[f] ?? f;
+    },
+    exportValue: (n: Nucleo) => {
+      const t = getTitolare(n.componenti);
+      if (!t) return "";
+      return t.fascia_eta ?? calcFascia(t.data_nascita);
+    },
+  },
+];
+
 // ── Utilities ────────────────────────────────────────────────────────────────
 
 function getTitolare(componenti: Componente[]): Componente | undefined {
@@ -247,6 +400,26 @@ export default function Stampe() {
   >("zona");
   const [consegneSortDir, setConsegneSortDir] = useState<SortDirection>("asc");
 
+  // Preferenze colonne Lista Nuclei
+  const [visibleColumnKeys, setVisibleColumnKeys] = useState<string[]>(() => {
+    const saved = localStorage.getItem("stampe_nuclei_columns");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Errore nel parsing delle preferenze colonne", e);
+      }
+    }
+    return ["tessera", "cf", "titolare", "zona", "stato", "scadenza"];
+  });
+
+  useEffect(() => {
+    localStorage.setItem(
+      "stampe_nuclei_columns",
+      JSON.stringify(visibleColumnKeys),
+    );
+  }, [visibleColumnKeys]);
+
   // ── Carica nuclei all'avvio ───────────────────────────────────────────────
   useEffect(() => {
     async function carica() {
@@ -254,7 +427,7 @@ export default function Stampe() {
       const { data, error } = await supabase
         .from("nuclei")
         .select(
-          "id, codice_fiscale, zona, stato, archiviato, " +
+          "id, numero_nucleo_familiare, numero_componenti, codice_fiscale, telefono, indirizzo, zona, stato, archiviato, " +
             "componenti(*), " +
             "iscrizioni(id, numero_tessera, data_inizio, data_scadenza)",
         )
@@ -571,29 +744,12 @@ export default function Stampe() {
   function esportaListaNucleiXML() {
     exportSpreadsheetXml(
       nucleiFiltrati,
-      [
-        {
-          header: "Numero tessera",
-          value: (n) => getUltimaIscrizione(n.iscrizioni)?.numero_tessera ?? "",
-        },
-        {
-          header: "Codice fiscale nucleo",
-          value: (n) => n.codice_fiscale ?? "",
-        },
-        {
-          header: "Titolare",
-          value: (n) => {
-            const t = getTitolare(n.componenti);
-            return t ? `${t.cognome} ${t.nome}` : "";
-          },
-        },
-        { header: "Zona", value: (n) => n.zona },
-        { header: "Stato", value: (n) => n.stato },
-        {
-          header: "Scadenza tessera",
-          value: (n) => getUltimaIscrizione(n.iscrizioni)?.data_scadenza ?? "",
-        },
-      ],
+      NUCLEI_COLUMNS_CONFIG.filter((c) => visibleColumnKeys.includes(c.id)).map(
+        (col) => ({
+          header: col.header,
+          value: col.exportValue,
+        }),
+      ),
       `lista_nuclei_${new Date().toISOString().slice(0, 10)}.xls`,
       "ListaNuclei",
     );
@@ -731,6 +887,32 @@ export default function Stampe() {
                     <MenuItem value="desc">Decrescente</MenuItem>
                   </Select>
                 </FormControl>
+                <Autocomplete
+                  multiple
+                  size="small"
+                  options={NUCLEI_COLUMNS_CONFIG}
+                  getOptionLabel={(option) => option.header}
+                  value={NUCLEI_COLUMNS_CONFIG.filter((c) =>
+                    visibleColumnKeys.includes(c.id),
+                  )}
+                  onChange={(_, newValue) => {
+                    setVisibleColumnKeys(newValue.map((v) => v.id));
+                  }}
+                  disableCloseOnSelect
+                  renderInput={(params) => (
+                    <TextField {...params} label="Colonne" placeholder="Aggiungi..." />
+                  )}
+                  sx={{ minWidth: 250, maxWidth: 400 }}
+                  renderTags={(value, getTagProps) =>
+                    value.map((option, index) => (
+                      <Chip
+                        label={option.header}
+                        {...getTagProps({ index })}
+                        size="small"
+                      />
+                    ))
+                  }
+                />
                 <Typography variant="body2" color="text.secondary">
                   {nucleiFiltrati.length} nuclei
                 </Typography>
@@ -769,56 +951,44 @@ export default function Stampe() {
                 <Table size="small">
                   <TableHead>
                     <TableRow sx={{ backgroundColor: "primary.main" }}>
-                      {[
-                        "N° Tessera",
-                        "Codice Fiscale",
-                        "Nominativo",
-                        "Zona",
-                        "Stato",
-                        "Scadenza",
-                      ].map((h) => (
+                      {NUCLEI_COLUMNS_CONFIG.filter((c) =>
+                        visibleColumnKeys.includes(c.id),
+                      ).map((col) => (
                         <TableCell
-                          key={h}
+                          key={col.id}
                           sx={{ color: "white", fontWeight: 700 }}
                         >
-                          {h}
+                          {col.header}
                         </TableCell>
                       ))}
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {nucleiFiltrati.map((n, i) => {
-                      const titolare = getTitolare(n.componenti);
-                      const ultima = getUltimaIscrizione(n.iscrizioni);
-                      return (
-                        <TableRow
-                          key={n.id}
-                          sx={{
-                            backgroundColor:
-                              i % 2 === 0 ? "transparent" : "action.hover",
-                          }}
-                        >
-                          <TableCell>{ultima?.numero_tessera ?? "—"}</TableCell>
-                          <TableCell>{n.codice_fiscale ?? "—"}</TableCell>
-                          <TableCell>
-                            {titolare
-                              ? `${titolare.cognome} ${titolare.nome}`
-                              : "—"}
+                    {nucleiFiltrati.map((n, i) => (
+                      <TableRow
+                        key={n.id}
+                        sx={{
+                          backgroundColor:
+                            i % 2 === 0 ? "transparent" : "action.hover",
+                        }}
+                      >
+                        {NUCLEI_COLUMNS_CONFIG.filter((c) =>
+                          visibleColumnKeys.includes(c.id),
+                        ).map((col) => (
+                          <TableCell key={col.id}>
+                            {col.id === "stato" ? (
+                              <StatusChip stato={n.stato} />
+                            ) : (
+                              col.value(n)
+                            )}
                           </TableCell>
-                          <TableCell>{n.zona}</TableCell>
-                          <TableCell>
-                            <StatusChip stato={n.stato} />
-                          </TableCell>
-                          <TableCell>
-                            {fmtData(ultima?.data_scadenza)}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                        ))}
+                      </TableRow>
+                    ))}
                     {nucleiFiltrati.length === 0 && (
                       <TableRow>
                         <TableCell
-                          colSpan={6}
+                          colSpan={visibleColumnKeys.length}
                           align="center"
                           sx={{ py: 4, color: "text.secondary" }}
                         >
