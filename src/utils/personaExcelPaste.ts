@@ -26,8 +26,11 @@ export type ParsePasteResult = {
 };
 
 function normalizzaData(s: string): string {
-  const m = s.trim().match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-  if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  const m = s.trim().match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2}|\d{4})$/);
+  if (m) {
+    const year = m[3].length === 2 ? `20${m[3]}` : m[3];
+    return `${year}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  }
   return s.trim();
 }
 
@@ -129,14 +132,25 @@ export function parsePastedPersoneFromExcel(text: string): ParsePasteResult {
   } else {
     const ncol = righe[0].length;
     if (ncol >= 18) {
+      // Formato FEAD fisso (senza intestazione):
+      // A(0)=N°Nucleo  B(1)=Zona  C(2)=Cognome  D(3)=Nome  E(4)=NazNascita
+      // F(5)=Sesso  G(6)=DataNascita  J(9)=Tessera  M(12)=Scadenza
+      // O(14)=Telefono  P(15)=Indirizzo  Q(16)=CF  R(17)=Nazionalità  S(18)=PaesiTerziUE
       iCognome = 2;
       iNome = 3;
       iNazNascita = 4;
       iSesso = 5;
       iDataNascita = 6;
-      iInvalido = 13;
       iNazionalita = 17;
       iPaesiTerzi = 18;
+      // colonne identificazione nucleo
+      iNr = 0;
+      iGr = 1;
+      iTess = 9;
+      iScad = 12;
+      iTel = 14;
+      iIndirizzo = 15;
+      iCodFisc = 16;
     }
     const isOldHeader = ["cognome", "nome", "cf", "cod"].some((k) =>
       righe[0][0]?.toLowerCase().includes(k),
@@ -167,39 +181,45 @@ export function parsePastedPersoneFromExcel(text: string): ParsePasteResult {
 
   // Extract nucleo identification from first non-empty value in each column
   const nucleo: NucleoIdentificazione = {};
-  if (headerIdx >= 0) {
-    const firstNonEmpty = (idx: number): string => {
-      if (idx < 0) return "";
-      for (const r of dati) {
-        const v = (r[idx] ?? "").trim();
-        if (v) return v;
-      }
-      return "";
-    };
 
-    const nr = firstNonEmpty(iNr);
-    if (nr) nucleo.numero_nucleo = nr;
+  const firstNonEmpty = (idx: number): string => {
+    if (idx < 0) return "";
+    for (const r of dati) {
+      const v = (r[idx] ?? "").trim();
+      if (v) return v;
+    }
+    return "";
+  };
 
-    const gr = firstNonEmpty(iGr).toUpperCase();
-    if (gr) nucleo.zona = ZONA_BY_GR[gr] ?? gr;
+  const nr = firstNonEmpty(iNr);
+  if (nr) nucleo.numero_nucleo = nr;
 
-    const tess = firstNonEmpty(iTess);
-    if (tess) nucleo.numero_tessera = tess;
+  const gr = firstNonEmpty(iGr).toUpperCase();
+  if (gr) nucleo.zona = ZONA_BY_GR[gr] ?? gr;
 
-    const scad = firstNonEmpty(iScad);
-    if (scad) nucleo.scadenza_tessera = normalizzaData(scad);
+  const tess = firstNonEmpty(iTess);
+  if (tess) nucleo.numero_tessera = tess;
 
-    const tel = firstNonEmpty(iTel);
-    if (tel) nucleo.telefono = tel;
+  const scad = firstNonEmpty(iScad);
+  if (scad) nucleo.scadenza_tessera = normalizzaData(scad);
 
-    const indir = firstNonEmpty(iIndirizzo);
-    if (indir) nucleo.indirizzo = indir;
+  const tel = firstNonEmpty(iTel);
+  if (tel) nucleo.telefono = tel;
 
-    const cf = firstNonEmpty(iCodFisc);
-    if (cf) nucleo.codice_fiscale_tesserato = cf.toUpperCase();
+  const indir = firstNonEmpty(iIndirizzo);
+  if (indir) nucleo.indirizzo = indir;
 
+  const cf = firstNonEmpty(iCodFisc);
+  if (cf) nucleo.codice_fiscale_tesserato = cf.toUpperCase();
+
+  // Numero componenti: usa colonna Excel se trovata (header mode),
+  // altrimenti calcola dalle righe parsate
+  if (iNrComp >= 0) {
     const nrComp = firstNonEmpty(iNrComp);
     if (nrComp) nucleo.numero_componenti = nrComp;
+  }
+  if (!nucleo.numero_componenti && persone.length > 0) {
+    nucleo.numero_componenti = String(persone.length);
   }
 
   return { persone, nucleo };
