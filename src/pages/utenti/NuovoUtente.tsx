@@ -27,6 +27,7 @@ import { supabase } from "@/api/supabase";
 import NationalityAutocomplete from "@/components/common/NationalityAutocomplete";
 import type { StatoNucleo } from "@/components/common/StatusChip";
 import type { PastedPersona } from "../../utils/personaExcelPaste";
+import type { NucleoIdentificazione } from "../../utils/personaExcelPaste";
 
 const ZONE = ["Pombio", "Duomo", "Medassino", "San Rocco"];
 const STATI: { value: StatoNucleo; label: string }[] = [
@@ -203,14 +204,48 @@ export default function NuovoUtente() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const importedPeople = (
-      location.state as { excelPersone?: PastedPersona[] } | null
-    )?.excelPersone;
+    const state = location.state as {
+      excelPersone?: PastedPersona[];
+      excelCfIdx?: number;
+      excelTitIdx?: number | null;
+      excelNucleo?: NucleoIdentificazione;
+    } | null;
+
+    const importedPeople = state?.excelPersone;
     if (!importedPeople || importedPeople.length === 0) return;
 
-    if (importedPeople[0]) {
-      setCapofamiglia(importedPeople[0]);
-      setComponentiExtra(importedPeople.slice(1));
+    const cfIdx = state?.excelCfIdx ?? 0;
+    const titIdx = state?.excelTitIdx ?? null; // null = stesso del capofamiglia
+
+    const cf = importedPeople[cfIdx] ?? importedPeople[0];
+    setCapofamiglia(cf);
+
+    if (titIdx !== null && titIdx !== cfIdx && importedPeople[titIdx]) {
+      setStessoSoggetto(false);
+      setTitolare(importedPeople[titIdx]);
+    } else {
+      setStessoSoggetto(true);
+    }
+
+    const extra = importedPeople.filter((_, i) => {
+      if (i === cfIdx) return false;
+      if (titIdx !== null && i === titIdx) return false;
+      return true;
+    });
+    setComponentiExtra(extra);
+
+    // Pre-popola Identificazione Nucleo
+    const nucleo = state?.excelNucleo;
+    if (nucleo) {
+      if (nucleo.zona) setZona(nucleo.zona);
+      if (nucleo.numero_nucleo) setNumeroNucleoFamiliare(nucleo.numero_nucleo);
+      if (nucleo.numero_tessera) setTessNumero(nucleo.numero_tessera);
+      if (nucleo.scadenza_tessera) setTessDataScadenza(nucleo.scadenza_tessera);
+      if (nucleo.telefono) setTelefono(nucleo.telefono);
+      if (nucleo.indirizzo) setIndirizzo(nucleo.indirizzo);
+      if (nucleo.codice_fiscale_tesserato)
+        setCfTesserato(nucleo.codice_fiscale_tesserato);
+      if (nucleo.numero_componenti) setNumeroComponenti(nucleo.numero_componenti);
     }
 
     navigate(location.pathname, { replace: true, state: null });

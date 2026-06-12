@@ -33,6 +33,11 @@ import {
   Pagination,
   Menu,
   TableSortLabel,
+  Radio,
+  RadioGroup,
+  FormControlLabel,
+  Checkbox,
+  Divider,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
@@ -57,7 +62,11 @@ import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/api/supabase";
 import type { StatoNucleo } from "@/components/common/StatusChip";
-import { parsePastedPersoneFromExcel } from "../../utils/personaExcelPaste";
+import {
+  parsePastedPersoneFromExcel,
+  type PastedPersona,
+  type NucleoIdentificazione,
+} from "../../utils/personaExcelPaste";
 import {
   parseNucleiFromExcel,
   type ImportNucleo,
@@ -284,6 +293,21 @@ export default function ListaUtenti() {
   const [expandedNucleoId, setExpandedNucleoId] = useState<string | null>(null);
   const [excelOpen, setExcelOpen] = useState(false);
   const [excelText, setExcelText] = useState("");
+  // Step 2 del dialog copia-incolla
+  const [pasteStep, setPasteStep] = useState<1 | 2>(1);
+  const [parsedPersone, setParsedPersone] = useState<PastedPersona[]>([]);
+  const [parsedNucleo, setParsedNucleo] = useState<NucleoIdentificazione>({});
+  const [pasteCfIdx, setPasteCfIdx] = useState(0);
+  const [pasteTitSameAsCf, setPasteTitSameAsCf] = useState(true);
+  const [pasteTitIdx, setPasteTitIdx] = useState(0);
+  const [pasteZona, setPasteZona] = useState("");
+  const [pasteNumeroNucleo, setPasteNumeroNucleo] = useState("");
+  const [pasteTessNumero, setPasteTessNumero] = useState("");
+  const [pasteTessScadenza, setPasteTessScadenza] = useState("");
+  const [pasteTelefono, setPasteTelefono] = useState("");
+  const [pasteIndirizzo, setPasteIndirizzo] = useState("");
+  const [pasteCfTesserato, setPasteCfTesserato] = useState("");
+  const [pasteNrComp, setPasteNrComp] = useState("");
   const [importOpen, setImportOpen] = useState(false);
   const [importFileName, setImportFileName] = useState("");
   const [importReading, setImportReading] = useState(false);
@@ -542,21 +566,68 @@ export default function ListaUtenti() {
 
   const handleAzioneCopiaIncolla = () => {
     closeAzioniMenu();
-    setExcelOpen(true);
+    setPasteStep(1);
     setExcelText("");
+    setParsedPersone([]);
+    setParsedNucleo({});
+    setPasteCfIdx(0);
+    setPasteTitSameAsCf(true);
+    setPasteTitIdx(0);
+    setPasteZona("");
+    setPasteNumeroNucleo("");
+    setPasteTessNumero("");
+    setPasteTessScadenza("");
+    setPasteTelefono("");
+    setPasteIndirizzo("");
+    setPasteCfTesserato("");
+    setPasteNrComp("");
+    setExcelOpen(true);
   };
 
-  const handleImportaDaCopiaIncolla = () => {
-    const persone = parsePastedPersoneFromExcel(excelText);
-    if (persone.length === 0) {
+  const handleAvantiCopiaIncolla = () => {
+    const result = parsePastedPersoneFromExcel(excelText);
+    if (result.persone.length === 0) {
       setError("Nessuna persona riconosciuta nel testo incollato.");
       return;
     }
+    setParsedPersone(result.persone);
+    setParsedNucleo(result.nucleo);
+    setPasteCfIdx(0);
+    setPasteTitSameAsCf(true);
+    setPasteTitIdx(0);
+    // Pre-popola i campi identificazione dai dati estratti
+    setPasteZona(result.nucleo.zona ?? "");
+    setPasteNumeroNucleo(result.nucleo.numero_nucleo ?? "");
+    setPasteTessNumero(result.nucleo.numero_tessera ?? "");
+    setPasteTessScadenza(result.nucleo.scadenza_tessera ?? "");
+    setPasteTelefono(result.nucleo.telefono ?? "");
+    setPasteIndirizzo(result.nucleo.indirizzo ?? "");
+    setPasteCfTesserato(result.nucleo.codice_fiscale_tesserato ?? "");
+    setPasteNrComp(result.nucleo.numero_componenti ?? "");
+    setPasteStep(2);
+  };
 
+  const handleImportaDaCopiaIncolla = () => {
+    const titolareIdx = pasteTitSameAsCf ? null : pasteTitIdx;
+    const excelNucleo: NucleoIdentificazione = {
+      zona: pasteZona || undefined,
+      numero_nucleo: pasteNumeroNucleo || undefined,
+      numero_tessera: pasteTessNumero || undefined,
+      scadenza_tessera: pasteTessScadenza || undefined,
+      telefono: pasteTelefono || undefined,
+      indirizzo: pasteIndirizzo || undefined,
+      codice_fiscale_tesserato: pasteCfTesserato || undefined,
+      numero_componenti: pasteNrComp || undefined,
+    };
     setExcelOpen(false);
     setExcelText("");
     navigate("/utenti/nuovo", {
-      state: { excelPersone: persone },
+      state: {
+        excelPersone: parsedPersone,
+        excelCfIdx: pasteCfIdx,
+        excelTitIdx: titolareIdx,
+        excelNucleo,
+      },
     });
   };
 
@@ -1615,51 +1686,231 @@ export default function ListaUtenti() {
       <Dialog
         open={excelOpen}
         onClose={() => setExcelOpen(false)}
-        maxWidth="md"
+        maxWidth={pasteStep === 2 ? "lg" : "md"}
         fullWidth
       >
-        <DialogTitle>Importa componenti da Excel</DialogTitle>
+        <DialogTitle>
+          {pasteStep === 1
+            ? "Importa componenti da Excel"
+            : "Assegna ruoli e dati nucleo"}
+        </DialogTitle>
         <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Copia le celle da Excel e incollale qui sotto. Il formato atteso è:
-            <br />
-            <strong>
-              Cognome [TAB] Nome [TAB] Data nascita [TAB] Nazionalità
-            </strong>
-            <br />
-            oppure, copiando direttamente dal file FEAD 2026, vengono rilevate
-            automaticamente tutte le colonne (Nazione di nascita, Nazionalità,
-            Sesso, Invalido, Paesi Terzi). La data può essere nel formato
-            GG/MM/AAAA oppure AAAA-MM-GG. Se la prima riga è un'intestazione
-            viene ignorata automaticamente.
-          </Typography>
-          <TextField
-            multiline
-            rows={8}
-            fullWidth
-            placeholder={
-              "Rossi\tMario\t01/01/1970\titaliana\nRossi\tMaria\t15/06/1995\titaliana"
-            }
-            value={excelText}
-            onChange={(e) => setExcelText(e.target.value)}
-          />
+          {pasteStep === 1 ? (
+            <>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Copia le celle da Excel e incollale qui sotto. Il formato atteso
+                è:
+                <br />
+                <strong>
+                  Cognome [TAB] Nome [TAB] Data nascita [TAB] Nazionalità
+                </strong>
+                <br />
+                oppure, copiando direttamente dal file FEAD 2026, vengono
+                rilevate automaticamente tutte le colonne (Nazione di nascita,
+                Nazionalità, Sesso, Invalido, Paesi Terzi, N° Nucleo, Zona,
+                Tessera, Scadenza, …). La data può essere nel formato GG/MM/AAAA
+                oppure AAAA-MM-GG. Se la prima riga è un'intestazione viene
+                ignorata automaticamente.
+              </Typography>
+              <TextField
+                multiline
+                rows={8}
+                fullWidth
+                placeholder={
+                  "Rossi\tMario\t01/01/1970\titaliana\nRossi\tMaria\t15/06/1995\titaliana"
+                }
+                value={excelText}
+                onChange={(e) => setExcelText(e.target.value)}
+              />
+            </>
+          ) : (
+            <>
+              {/* Tabella assegnazione ruoli */}
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                Seleziona chi è il capofamiglia e il titolare della tessera:
+              </Typography>
+              <TableContainer
+                component={Paper}
+                variant="outlined"
+                sx={{ mb: 2 }}
+              >
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Cognome</TableCell>
+                      <TableCell>Nome</TableCell>
+                      <TableCell>Data nascita</TableCell>
+                      <TableCell>Nazionalità</TableCell>
+                      <TableCell>Sesso</TableCell>
+                      <TableCell align="center">Capofamiglia</TableCell>
+                      {!pasteTitSameAsCf && (
+                        <TableCell align="center">Titolare tessera</TableCell>
+                      )}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {parsedPersone.map((p, i) => (
+                      <TableRow
+                        key={i}
+                        selected={i === pasteCfIdx}
+                        hover
+                      >
+                        <TableCell>{p.cognome || "—"}</TableCell>
+                        <TableCell>{p.nome || "—"}</TableCell>
+                        <TableCell>
+                          {p.data_nascita ? formatDate(p.data_nascita) : "—"}
+                        </TableCell>
+                        <TableCell>{p.nazionalita || "—"}</TableCell>
+                        <TableCell>{p.sesso || "—"}</TableCell>
+                        <TableCell align="center" padding="checkbox">
+                          <RadioGroup
+                            value={String(pasteCfIdx)}
+                            onChange={() => {
+                              setPasteCfIdx(i);
+                              if (pasteTitSameAsCf) setPasteTitIdx(i);
+                            }}
+                          >
+                            <Radio value={String(i)} size="small" />
+                          </RadioGroup>
+                        </TableCell>
+                        {!pasteTitSameAsCf && (
+                          <TableCell align="center" padding="checkbox">
+                            <RadioGroup
+                              value={String(pasteTitIdx)}
+                              onChange={() => setPasteTitIdx(i)}
+                            >
+                              <Radio value={String(i)} size="small" />
+                            </RadioGroup>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={pasteTitSameAsCf}
+                    onChange={(e) => {
+                      setPasteTitSameAsCf(e.target.checked);
+                      if (e.target.checked) setPasteTitIdx(pasteCfIdx);
+                    }}
+                    size="small"
+                  />
+                }
+                label="Il titolare della tessera coincide con il capofamiglia"
+                sx={{ mb: 2 }}
+              />
+
+              <Divider sx={{ mb: 2 }} />
+
+              {/* Form identificazione nucleo */}
+              <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
+                Identificazione Nucleo
+              </Typography>
+              <Stack
+                direction="row"
+                sx={{ gap: 2, flexWrap: "wrap", mb: 1.5 }}
+              >
+                <TextField
+                  select
+                  label="Zona"
+                  value={pasteZona}
+                  onChange={(e) => setPasteZona(e.target.value)}
+                  sx={{ minWidth: 160 }}
+                >
+                  <MenuItem value="">
+                    <em>Nessuna</em>
+                  </MenuItem>
+                  {ZONE_FILTER.slice(1).map((z) => (
+                    <MenuItem key={z} value={z}>
+                      {z}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <TextField
+                  label="N° Nucleo familiare"
+                  value={pasteNumeroNucleo}
+                  onChange={(e) => setPasteNumeroNucleo(e.target.value)}
+                  sx={{ minWidth: 160 }}
+                />
+                <TextField
+                  label="N° Tessera"
+                  value={pasteTessNumero}
+                  onChange={(e) => setPasteTessNumero(e.target.value)}
+                  sx={{ minWidth: 140 }}
+                />
+                <TextField
+                  label="Scadenza tessera"
+                  type="date"
+                  value={pasteTessScadenza}
+                  onChange={(e) => setPasteTessScadenza(e.target.value)}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                  sx={{ minWidth: 170 }}
+                />
+                <TextField
+                  label="N° Componenti"
+                  value={pasteNrComp}
+                  onChange={(e) => setPasteNrComp(e.target.value)}
+                  sx={{ minWidth: 140 }}
+                />
+              </Stack>
+              <Stack direction="row" sx={{ gap: 2, flexWrap: "wrap" }}>
+                <TextField
+                  label="CF Tesserato"
+                  value={pasteCfTesserato}
+                  onChange={(e) =>
+                    setPasteCfTesserato(e.target.value.toUpperCase())
+                  }
+                  sx={{ minWidth: 200 }}
+                />
+                <TextField
+                  label="Telefono"
+                  value={pasteTelefono}
+                  onChange={(e) => setPasteTelefono(e.target.value)}
+                  sx={{ minWidth: 160 }}
+                />
+                <TextField
+                  label="Indirizzo"
+                  value={pasteIndirizzo}
+                  onChange={(e) => setPasteIndirizzo(e.target.value)}
+                  sx={{ flex: 1, minWidth: 220 }}
+                />
+              </Stack>
+            </>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button
-            onClick={() => {
-              setExcelOpen(false);
-              setExcelText("");
-            }}
-          >
-            Annulla
-          </Button>
-          <Button
-            variant="contained"
-            onClick={handleImportaDaCopiaIncolla}
-            disabled={!excelText.trim()}
-          >
-            Importa
-          </Button>
+          {pasteStep === 1 ? (
+            <>
+              <Button
+                onClick={() => {
+                  setExcelOpen(false);
+                  setExcelText("");
+                }}
+              >
+                Annulla
+              </Button>
+              <Button
+                variant="contained"
+                onClick={handleAvantiCopiaIncolla}
+                disabled={!excelText.trim()}
+              >
+                Avanti →
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button onClick={() => setPasteStep(1)}>← Indietro</Button>
+              <Button sx={{ ml: "auto" }} onClick={() => setExcelOpen(false)}>
+                Annulla
+              </Button>
+              <Button variant="contained" onClick={handleImportaDaCopiaIncolla}>
+                Importa
+              </Button>
+            </>
+          )}
         </DialogActions>
       </Dialog>
 

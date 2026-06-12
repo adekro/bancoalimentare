@@ -9,6 +9,22 @@ export type PastedPersona = {
   invalido: boolean;
 };
 
+export type NucleoIdentificazione = {
+  numero_nucleo?: string;
+  zona?: string;
+  numero_tessera?: string;
+  scadenza_tessera?: string;
+  telefono?: string;
+  indirizzo?: string;
+  codice_fiscale_tesserato?: string;
+  numero_componenti?: string;
+};
+
+export type ParsePasteResult = {
+  persone: PastedPersona[];
+  nucleo: NucleoIdentificazione;
+};
+
 function normalizzaData(s: string): string {
   const m = s.trim().match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
   if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
@@ -29,13 +45,20 @@ function normBool(v: string): boolean {
   return ["X", "SI", "S", "YES", "Y", "1", "TRUE"].includes(v.toUpperCase());
 }
 
-export function parsePastedPersoneFromExcel(text: string): PastedPersona[] {
+const ZONA_BY_GR: Record<string, string> = {
+  S: "San Rocco",
+  D: "Duomo",
+  P: "Pombio",
+  M: "Medassino",
+};
+
+export function parsePastedPersoneFromExcel(text: string): ParsePasteResult {
   const righe = text
     .split(/\r?\n/)
     .map((r) => r.split("\t").map((c) => c.trim()))
     .filter((r) => r.length >= 2 && r.some(Boolean));
 
-  if (righe.length === 0) return [];
+  if (righe.length === 0) return { persone: [], nucleo: {} };
 
   const primaNorm = righe[0].map(normalizeHeaderCell);
   const cogIdx = primaNorm.findIndex((c) => c.includes("COGNOME"));
@@ -52,6 +75,16 @@ export function parsePastedPersoneFromExcel(text: string): PastedPersona[] {
   let iSesso = -1;
   let iPaesiTerzi = -1;
   let iInvalido = -1;
+
+  // Nucleo identification column indices (header mode only)
+  let iNr = -1;
+  let iGr = -1;
+  let iTess = -1;
+  let iScad = -1;
+  let iTel = -1;
+  let iIndirizzo = -1;
+  let iCodFisc = -1;
+  let iNrComp = -1;
 
   if (cogIdx >= 0 && nomIdx >= 0) {
     headerIdx = 0;
@@ -75,6 +108,24 @@ export function parsePastedPersoneFromExcel(text: string): PastedPersona[] {
     );
     iInvalido = primaNorm.findIndex((c) => c === "INV");
     if (iNazionalita < 0) iNazionalita = iNazNascita;
+
+    // Nucleo identification columns
+    iNr = primaNorm.findIndex(
+      (c) => c === "NR" || c === "N R" || c.startsWith("NR FASC"),
+    );
+    iGr = primaNorm.findIndex(
+      (c) => c === "GR" || c === "GR " || c === "GRUPPO",
+    );
+    iTess = primaNorm.findIndex((c) => c === "TESS" || c.startsWith("TESS"));
+    iScad = primaNorm.findIndex((c) => c === "SCAD" || c.startsWith("SCAD"));
+    iTel = primaNorm.findIndex(
+      (c) => c.startsWith("TELEFONO") || c === "TEL",
+    );
+    iIndirizzo = primaNorm.findIndex((c) => c.startsWith("INDIRIZZO"));
+    iCodFisc = primaNorm.findIndex((c) => c.includes("COD FISC"));
+    iNrComp = primaNorm.findIndex(
+      (c) => c === "NR COMP" || c.startsWith("NR COMP"),
+    );
   } else {
     const ncol = righe[0].length;
     if (ncol >= 18) {
@@ -95,7 +146,7 @@ export function parsePastedPersoneFromExcel(text: string): PastedPersona[] {
 
   const dati = headerIdx >= 0 ? righe.slice(1) : righe;
 
-  return dati
+  const persone: PastedPersona[] = dati
     .filter((r) => r.some(Boolean))
     .map((r) => ({
       cognome: r[iCognome] ?? "",
@@ -113,4 +164,43 @@ export function parsePastedPersoneFromExcel(text: string): PastedPersona[] {
       paesi_terzi_ue: iPaesiTerzi >= 0 ? normBool(r[iPaesiTerzi] ?? "") : false,
       invalido: iInvalido >= 0 ? normBool(r[iInvalido] ?? "") : false,
     }));
+
+  // Extract nucleo identification from first non-empty value in each column
+  const nucleo: NucleoIdentificazione = {};
+  if (headerIdx >= 0) {
+    const firstNonEmpty = (idx: number): string => {
+      if (idx < 0) return "";
+      for (const r of dati) {
+        const v = (r[idx] ?? "").trim();
+        if (v) return v;
+      }
+      return "";
+    };
+
+    const nr = firstNonEmpty(iNr);
+    if (nr) nucleo.numero_nucleo = nr;
+
+    const gr = firstNonEmpty(iGr).toUpperCase();
+    if (gr) nucleo.zona = ZONA_BY_GR[gr] ?? gr;
+
+    const tess = firstNonEmpty(iTess);
+    if (tess) nucleo.numero_tessera = tess;
+
+    const scad = firstNonEmpty(iScad);
+    if (scad) nucleo.scadenza_tessera = normalizzaData(scad);
+
+    const tel = firstNonEmpty(iTel);
+    if (tel) nucleo.telefono = tel;
+
+    const indir = firstNonEmpty(iIndirizzo);
+    if (indir) nucleo.indirizzo = indir;
+
+    const cf = firstNonEmpty(iCodFisc);
+    if (cf) nucleo.codice_fiscale_tesserato = cf.toUpperCase();
+
+    const nrComp = firstNonEmpty(iNrComp);
+    if (nrComp) nucleo.numero_componenti = nrComp;
+  }
+
+  return { persone, nucleo };
 }
