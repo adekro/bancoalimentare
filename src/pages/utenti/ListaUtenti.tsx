@@ -256,6 +256,7 @@ function isCapofamigliaTitolare(componenti: Componente[]) {
 
 function matchSearch(n: Nucleo, q: string) {
   const low = q.toLowerCase();
+  if (n.numero_nucleo_familiare?.toLowerCase().includes(low)) return true;
   if (getCodiceFiscaleTesserato(n)?.toLowerCase().includes(low)) return true;
   if (n.iscrizioni.some((t) => t.numero_tessera.toLowerCase().includes(low)))
     return true;
@@ -1182,7 +1183,7 @@ export default function ListaUtenti() {
             sx={{ alignItems: { xs: "stretch", sm: "center" } }}
           >
             <TextField
-              placeholder="Cerca nome, CF, tessera..."
+              placeholder="Cerca nome, CF, tessera, n. nucleo..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               size="small"
