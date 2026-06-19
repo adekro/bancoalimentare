@@ -163,7 +163,7 @@ function SezionePersona({
               }
             />
           }
-          label="Extra UE"
+          label="UE"
           sx={{ mt: 1.2 }}
         />
         <FormControlLabel

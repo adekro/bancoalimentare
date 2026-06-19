@@ -1341,7 +1341,7 @@ export default function Stampe() {
                             "Nuclei",
                             "Componenti",
                             "Disabili",
-                            "Extra UE",
+                            "UE",
                             "Paesi terzi",
                           ].map((h) => (
                             <TableCell

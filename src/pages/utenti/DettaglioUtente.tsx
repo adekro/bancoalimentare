@@ -198,7 +198,7 @@ function SezionePersona({
               }
             />
           }
-          label="Extra UE"
+          label="UE"
         />
         <FormControlLabel
           control={
