@@ -201,6 +201,8 @@ export default function NuovoUtente() {
   const location = useLocation();
   const [cfTesserato, setCfTesserato] = useState("");
   const [numeroNucleoFamiliare, setNumeroNucleoFamiliare] = useState("");
+  const [suggestedNumeroNucleoFamiliare, setSuggestedNumeroNucleoFamiliare] =
+    useState("");
   const [numeroComponenti, setNumeroComponenti] = useState("");
   const [zona, setZona] = useState("");
   const [telefono, setTelefono] = useState("");
@@ -269,8 +271,6 @@ export default function NuovoUtente() {
     let cancelled = false;
 
     async function loadSuggestedNumeroNucleo() {
-      if (numeroNucleoFamiliare.trim()) return;
-
       const { data, error: nucleiErr } = await supabase
         .from("nuclei")
         .select("numero_nucleo_familiare")
@@ -286,7 +286,7 @@ export default function NuovoUtente() {
       }, 0);
 
       if (!cancelled) {
-        setNumeroNucleoFamiliare(String(maxNumero + 1));
+        setSuggestedNumeroNucleoFamiliare(String(maxNumero + 1));
       }
     }
 
@@ -295,7 +295,7 @@ export default function NuovoUtente() {
     return () => {
       cancelled = true;
     };
-  }, [numeroNucleoFamiliare]);
+  }, []);
 
   useEffect(() => {
     if (stessoSoggetto) {
@@ -619,6 +619,12 @@ export default function NuovoUtente() {
                   label="Numero nucleo familiare"
                   value={numeroNucleoFamiliare}
                   onChange={(e) => setNumeroNucleoFamiliare(e.target.value)}
+                  helperText={
+                    !numeroNucleoFamiliare.trim() &&
+                    suggestedNumeroNucleoFamiliare
+                      ? `Proposta: ${suggestedNumeroNucleoFamiliare}`
+                      : " "
+                  }
                   sx={{ flex: 1, minWidth: { md: 220 } }}
                 />
 

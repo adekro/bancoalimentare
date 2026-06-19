@@ -239,6 +239,8 @@ export default function DettaglioUtente() {
 
   // Stato form nucleo
   const [numeroNucleoFamiliare, setNumeroNucleoFamiliare] = useState("");
+  const [suggestedNumeroNucleoFamiliare, setSuggestedNumeroNucleoFamiliare] =
+    useState("");
   const [numeroComponenti, setNumeroComponenti] = useState("");
   const [cfTesserato, setCfTesserato] = useState("");
   const [numeroTessera, setNumeroTessera] = useState("");
@@ -273,6 +275,36 @@ export default function DettaglioUtente() {
     data_scadenza: "",
     note: "",
   });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSuggestedNumeroNucleo() {
+      const { data, error: nucleiErr } = await supabase
+        .from("nuclei")
+        .select("numero_nucleo_familiare")
+        .not("numero_nucleo_familiare", "is", null);
+
+      if (nucleiErr || !data || cancelled) return;
+
+      const maxNumero = data.reduce((max, row) => {
+        const raw = String(row.numero_nucleo_familiare ?? "").trim();
+        if (!/^\d+$/.test(raw)) return max;
+        const value = Number.parseInt(raw, 10);
+        return Number.isNaN(value) ? max : Math.max(max, value);
+      }, 0);
+
+      if (!cancelled) {
+        setSuggestedNumeroNucleoFamiliare(String(maxNumero + 1));
+      }
+    }
+
+    void loadSuggestedNumeroNucleo();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [savingIscrizione, setSavingIscrizione] = useState(false);
   const [deletingIscrizioneId, setDeletingIscrizioneId] = useState<
     string | null
@@ -955,6 +987,12 @@ export default function DettaglioUtente() {
                   label="Numero nucleo familiare"
                   value={numeroNucleoFamiliare}
                   onChange={(e) => setNumeroNucleoFamiliare(e.target.value)}
+                  helperText={
+                    !numeroNucleoFamiliare.trim() &&
+                    suggestedNumeroNucleoFamiliare
+                      ? `Proposta: ${suggestedNumeroNucleoFamiliare}`
+                      : " "
+                  }
                   sx={{ flex: 1, minWidth: 220 }}
                 />
 
