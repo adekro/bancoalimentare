@@ -5,6 +5,7 @@ export type PastedPersona = {
   nazione_nascita: string;
   nazionalita: string;
   sesso: "M" | "F" | "";
+  extra_ue: boolean;
   paesi_terzi_ue: boolean;
   invalido: boolean;
 };
@@ -175,6 +176,7 @@ export function parsePastedPersoneFromExcel(text: string): ParsePasteResult {
         iSesso >= 0 && ["M", "F"].includes((r[iSesso] ?? "").toUpperCase())
           ? (r[iSesso].toUpperCase() as PastedPersona["sesso"])
           : "",
+      extra_ue: false,
       paesi_terzi_ue: iPaesiTerzi >= 0 ? normBool(r[iPaesiTerzi] ?? "") : false,
       invalido: iInvalido >= 0 ? normBool(r[iInvalido] ?? "") : false,
     }));

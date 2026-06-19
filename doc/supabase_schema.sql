@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS public.componenti (
     nazionalita  TEXT,
     nazione_nascita TEXT,
     sesso        TEXT CHECK (sesso IN ('M', 'F')),
+    extra_ue     BOOLEAN            NOT NULL DEFAULT FALSE,
     paesi_terzi_ue BOOLEAN          NOT NULL DEFAULT FALSE,
     invalido     BOOLEAN            NOT NULL DEFAULT FALSE,
     fascia_eta   fascia_eta,                    -- calcolata automaticamente da data_nascita
@@ -106,6 +107,7 @@ ALTER TABLE public.nuclei ADD COLUMN IF NOT EXISTS telefono TEXT;
 ALTER TABLE public.nuclei ADD COLUMN IF NOT EXISTS indirizzo TEXT;
 
 ALTER TABLE public.componenti ADD COLUMN IF NOT EXISTS sesso TEXT;
+ALTER TABLE public.componenti ADD COLUMN IF NOT EXISTS extra_ue BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE public.componenti ADD COLUMN IF NOT EXISTS paesi_terzi_ue BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE public.componenti ADD COLUMN IF NOT EXISTS codice_fiscale TEXT;
 ALTER TABLE public.componenti ADD COLUMN IF NOT EXISTS nazione_nascita TEXT;

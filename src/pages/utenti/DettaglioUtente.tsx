@@ -58,6 +58,7 @@ type PersonaForm = {
   nazione_nascita: string;
   nazionalita: string;
   sesso: "M" | "F" | "";
+  extra_ue: boolean;
   paesi_terzi_ue: boolean;
   invalido: boolean;
 };
@@ -68,6 +69,7 @@ const PERSONA_VUOTA: PersonaForm = {
   nazione_nascita: "",
   nazionalita: "",
   sesso: "",
+  extra_ue: false,
   paesi_terzi_ue: false,
   invalido: false,
 };
@@ -190,13 +192,24 @@ function SezionePersona({
         <FormControlLabel
           control={
             <Switch
+              checked={value.extra_ue}
+              onChange={(e) =>
+                onChange({ ...value, extra_ue: e.target.checked })
+              }
+            />
+          }
+          label="Extra UE"
+        />
+        <FormControlLabel
+          control={
+            <Switch
               checked={value.paesi_terzi_ue}
               onChange={(e) =>
                 onChange({ ...value, paesi_terzi_ue: e.target.checked })
               }
             />
           }
-          label="Paesi terzi UE (extra-UE)"
+          label="Paesi terzi"
         />
         <FormControlLabel
           control={
@@ -372,6 +385,7 @@ export default function DettaglioUtente() {
           nazione_nascita: capoFound.nazione_nascita ?? "",
           nazionalita: capoFound.nazionalita ?? "",
           sesso: capoFound.sesso ?? "",
+          extra_ue: Boolean(capoFound.extra_ue),
           paesi_terzi_ue: Boolean(capoFound.paesi_terzi_ue),
           invalido: Boolean(capoFound.invalido),
         });
@@ -385,6 +399,7 @@ export default function DettaglioUtente() {
           nazione_nascita: titolFound.nazione_nascita ?? "",
           nazionalita: titolFound.nazionalita ?? "",
           sesso: titolFound.sesso ?? "",
+          extra_ue: Boolean(titolFound.extra_ue),
           paesi_terzi_ue: Boolean(titolFound.paesi_terzi_ue),
           invalido: Boolean(titolFound.invalido),
         });
@@ -404,6 +419,7 @@ export default function DettaglioUtente() {
             nazione_nascita: string | null;
             nazionalita: string | null;
             sesso: "M" | "F" | null;
+            extra_ue: boolean;
             paesi_terzi_ue: boolean;
             invalido: boolean;
             codice_fiscale?: string | null;
@@ -414,6 +430,7 @@ export default function DettaglioUtente() {
             nazione_nascita: c.nazione_nascita ?? "",
             nazionalita: c.nazionalita ?? "",
             sesso: c.sesso ?? "",
+            extra_ue: Boolean(c.extra_ue),
             paesi_terzi_ue: Boolean(c.paesi_terzi_ue),
             invalido: Boolean(c.invalido),
           }),
@@ -614,6 +631,7 @@ export default function DettaglioUtente() {
         nazione_nascita: capofamiglia.nazione_nascita || null,
         nazionalita: capofamiglia.nazionalita || null,
         sesso: capofamiglia.sesso || null,
+        extra_ue: capofamiglia.extra_ue,
         paesi_terzi_ue: capofamiglia.paesi_terzi_ue,
         invalido: capofamiglia.invalido,
         fascia_eta: calcFascia(capofamiglia.data_nascita),
@@ -630,6 +648,7 @@ export default function DettaglioUtente() {
         nazione_nascita: titolare.nazione_nascita || null,
         nazionalita: titolare.nazionalita || null,
         sesso: titolare.sesso || null,
+        extra_ue: titolare.extra_ue,
         paesi_terzi_ue: titolare.paesi_terzi_ue,
         invalido: titolare.invalido,
         fascia_eta: calcFascia(titolare.data_nascita),
@@ -647,6 +666,7 @@ export default function DettaglioUtente() {
           nazione_nascita: c.nazione_nascita || null,
           nazionalita: c.nazionalita || null,
           sesso: c.sesso || null,
+          extra_ue: c.extra_ue,
           paesi_terzi_ue: c.paesi_terzi_ue,
           invalido: c.invalido,
           fascia_eta: calcFascia(c.data_nascita),

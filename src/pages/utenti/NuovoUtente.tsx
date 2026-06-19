@@ -44,6 +44,7 @@ type PersonaForm = {
   nazione_nascita: string;
   nazionalita: string;
   sesso: "M" | "F" | "";
+  extra_ue: boolean;
   paesi_terzi_ue: boolean;
   invalido: boolean;
 };
@@ -55,6 +56,7 @@ const PERSONA_VUOTA: PersonaForm = {
   nazione_nascita: "",
   nazionalita: "",
   sesso: "",
+  extra_ue: false,
   paesi_terzi_ue: false,
   invalido: false,
 };
@@ -155,13 +157,25 @@ function SezionePersona({
         <FormControlLabel
           control={
             <Checkbox
+              checked={value.extra_ue}
+              onChange={(e) =>
+                onChange({ ...value, extra_ue: e.target.checked })
+              }
+            />
+          }
+          label="Extra UE"
+          sx={{ mt: 1.2 }}
+        />
+        <FormControlLabel
+          control={
+            <Checkbox
               checked={value.paesi_terzi_ue}
               onChange={(e) =>
                 onChange({ ...value, paesi_terzi_ue: e.target.checked })
               }
             />
           }
-          label="Paesi terzi UE (extra-UE)"
+          label="Paesi terzi"
           sx={{ mt: 1.2 }}
         />
         <FormControlLabel
@@ -414,6 +428,7 @@ export default function NuovoUtente() {
         nazione_nascita: capofamiglia.nazione_nascita || null,
         nazionalita: capofamiglia.nazionalita || null,
         sesso: capofamiglia.sesso || null,
+        extra_ue: capofamiglia.extra_ue,
         paesi_terzi_ue: capofamiglia.paesi_terzi_ue,
         invalido: capofamiglia.invalido,
         fascia_eta: calcFascia(capofamiglia.data_nascita),
@@ -431,6 +446,7 @@ export default function NuovoUtente() {
         nazione_nascita: titolare.nazione_nascita || null,
         nazionalita: titolare.nazionalita || null,
         sesso: titolare.sesso || null,
+        extra_ue: titolare.extra_ue,
         paesi_terzi_ue: titolare.paesi_terzi_ue,
         invalido: titolare.invalido,
         fascia_eta: calcFascia(titolare.data_nascita),
@@ -449,6 +465,7 @@ export default function NuovoUtente() {
           nazione_nascita: c.nazione_nascita || null,
           nazionalita: c.nazionalita || null,
           sesso: c.sesso || null,
+          extra_ue: c.extra_ue,
           paesi_terzi_ue: c.paesi_terzi_ue,
           invalido: c.invalido,
           fascia_eta: calcFascia(c.data_nascita),
