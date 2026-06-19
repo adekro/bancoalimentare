@@ -684,28 +684,87 @@ export default function DettaglioUtente() {
     }
 
     if (shouldCreateRinnovo) {
-      const { data: newIscrizione, error: iscrErr } = await supabase
-        .from("iscrizioni")
-        .insert({
-          nucleo_id: id,
-          numero_tessera: normalizedNumeroTessera,
-          data_scadenza: normalizedScadenzaTessera,
-          note: "Rinnovo registrato da modifica nucleo",
-        })
-        .select(
-          "id, numero_tessera, data_inizio, data_scadenza, note, created_at",
-        )
-        .single();
+      let savedIscrizione: Iscrizione | null = null;
 
-      if (iscrErr || !newIscrizione) {
-        setError(iscrErr?.message ?? "Errore salvataggio rinnovo iscrizione.");
-        setSaving(false);
-        return;
+      if (scadenzaYear) {
+        const startOfYear = `${scadenzaYear}-01-01`;
+        const endOfYear = `${scadenzaYear}-12-31`;
+        const { data: existingIscrizione, error: existingIscrErr } =
+          await supabase
+            .from("iscrizioni")
+            .select(
+              "id, numero_tessera, data_inizio, data_scadenza, note, created_at",
+            )
+            .eq("nucleo_id", id)
+            .gte("data_scadenza", startOfYear)
+            .lte("data_scadenza", endOfYear)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (existingIscrErr) {
+          setError(existingIscrErr.message);
+          setSaving(false);
+          return;
+        }
+
+        if (existingIscrizione) {
+          const { data: updatedIscrizione, error: updateIscrErr } =
+            await supabase
+              .from("iscrizioni")
+              .update({
+                numero_tessera: normalizedNumeroTessera,
+                data_scadenza: normalizedScadenzaTessera,
+                note: "Rinnovo registrato da modifica nucleo",
+              })
+              .eq("id", existingIscrizione.id)
+              .select(
+                "id, numero_tessera, data_inizio, data_scadenza, note, created_at",
+              )
+              .single();
+
+          if (updateIscrErr || !updatedIscrizione) {
+            setError(
+              updateIscrErr?.message ??
+                "Errore aggiornamento rinnovo iscrizione.",
+            );
+            setSaving(false);
+            return;
+          }
+
+          savedIscrizione = updatedIscrizione;
+        }
       }
 
-      setIscrizioni((prev) => [newIscrizione, ...prev]);
+      if (!savedIscrizione) {
+        const { data: newIscrizione, error: iscrErr } = await supabase
+          .from("iscrizioni")
+          .insert({
+            nucleo_id: id,
+            numero_tessera: normalizedNumeroTessera,
+            data_scadenza: normalizedScadenzaTessera,
+            note: "Rinnovo registrato da modifica nucleo",
+          })
+          .select(
+            "id, numero_tessera, data_inizio, data_scadenza, note, created_at",
+          )
+          .single();
+
+        if (iscrErr || !newIscrizione) {
+          setError(iscrErr?.message ?? "Errore salvataggio rinnovo iscrizione.");
+          setSaving(false);
+          return;
+        }
+
+        savedIscrizione = newIscrizione;
+      }
+
+      setIscrizioni((prev) => {
+        const filtered = prev.filter((item) => item.id !== savedIscrizione?.id);
+        return savedIscrizione ? [savedIscrizione, ...filtered] : filtered;
+      });
       setNuovaIscrizione({
-        numero_tessera: newIscrizione.numero_tessera,
+        numero_tessera: savedIscrizione.numero_tessera,
         data_inizio: "",
         data_scadenza: "",
         note: "",

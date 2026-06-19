@@ -42,6 +42,7 @@ type Componente = {
   nazionalita: string | null;
   nazione_nascita: string | null;
   sesso: string | null;
+  extra_ue: boolean | null;
   paesi_terzi_ue: boolean | null;
   invalido: boolean | null;
   fascia_eta: string | null;
@@ -1340,6 +1341,7 @@ export default function Stampe() {
                             "Nuclei",
                             "Componenti",
                             "Disabili",
+                            "Extra UE",
                             "Paesi terzi",
                           ].map((h) => (
                             <TableCell
@@ -1363,6 +1365,9 @@ export default function Stampe() {
                               <TableCell align="right">{cz.length}</TableCell>
                               <TableCell align="right">
                                 {cz.filter((c) => c.invalido).length}
+                              </TableCell>
+                              <TableCell align="right">
+                                {cz.filter((c) => c.extra_ue).length}
                               </TableCell>
                               <TableCell align="right">
                                 {cz.filter((c) => c.paesi_terzi_ue).length}
