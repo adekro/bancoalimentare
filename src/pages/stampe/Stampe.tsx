@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Autocomplete,
@@ -114,6 +114,7 @@ type DistWithNucleoRaw = {
   nuclei: {
     id: string;
     codice_fiscale: string | null;
+    numero_componenti: number | null;
     zona: string;
     archiviato: boolean;
     componenti: Componente[];
@@ -143,6 +144,15 @@ type ConsegnaSettoreRow = {
   numeroTessera: string | null;
   numeroPacchi: number | null;
   centro: string;
+};
+
+type RiepilogoDistribuzioniRow = {
+  key: string;
+  label: string;
+  componentCount: number | null;
+  precedenti: Record<string, number>;
+  date: Record<string, number>;
+  totale: number;
 };
 
 type SortDirection = "asc" | "desc";
@@ -362,6 +372,33 @@ function compareValues(
   });
 }
 
+function normalizeComponentCount(
+  nucleo: DistWithNucleoRaw["nuclei"],
+): number | null {
+  if (!nucleo) return null;
+  if (nucleo.componenti.length > 0) return nucleo.componenti.length;
+  if (
+    typeof nucleo.numero_componenti === "number" &&
+    Number.isFinite(nucleo.numero_componenti) &&
+    nucleo.numero_componenti > 0
+  ) {
+    return nucleo.numero_componenti;
+  }
+  return null;
+}
+
+function sortCenterNames(values: string[]): string[] {
+  const zoneIndex = new Map(ZONE.map((value, index) => [value, index]));
+  return [...values].sort((a, b) => {
+    const ai = zoneIndex.get(a);
+    const bi = zoneIndex.get(b);
+    if (ai != null && bi != null) return ai - bi;
+    if (ai != null) return -1;
+    if (bi != null) return 1;
+    return a.localeCompare(b, "it", { sensitivity: "base" });
+  });
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function Stampe() {
@@ -386,6 +423,9 @@ export default function Stampe() {
   const [loadingDistribuzioni, setLoadingDistribuzioni] = useState(false);
   const [distribuzioniLoaded, setDistribuzioniLoaded] = useState(false);
   const [distRows, setDistRows] = useState<DistWithNucleoRaw[]>([]);
+  const [selectedRiepilogoDates, setSelectedRiepilogoDates] = useState<string[]>(
+    [],
+  );
 
   // Ordinamenti
   const [listaSortBy, setListaSortBy] = useState<
@@ -413,6 +453,29 @@ export default function Stampe() {
     }
     return ["tessera", "cf", "titolare", "zona", "stato", "scadenza"];
   });
+
+  const availableDistribuzioneDates = useMemo(
+    () =>
+      [...new Set(distRows.map((row) => row.data))]
+        .filter(Boolean)
+        .sort((a, b) => b.localeCompare(a)),
+    [distRows],
+  );
+
+  useEffect(() => {
+    if (availableDistribuzioneDates.length === 0) {
+      setSelectedRiepilogoDates([]);
+      return;
+    }
+
+    setSelectedRiepilogoDates((current) => {
+      const validCurrent = current.filter((value) =>
+        availableDistribuzioneDates.includes(value),
+      );
+      if (validCurrent.length > 0) return validCurrent;
+      return availableDistribuzioneDates.slice(0, 4);
+    });
+  }, [availableDistribuzioneDates]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -442,7 +505,7 @@ export default function Stampe() {
 
   // ── Carica magazzino al primo accesso al tab 3 ───────────────────────────
   useEffect(() => {
-    if (tab !== 5 || magLoaded) return;
+    if (tab !== 99 || magLoaded) return;
     async function caricaMag() {
       setLoadingMag(true);
       const [{ data: articoli }, { data: movimenti }] = await Promise.all([
@@ -483,7 +546,7 @@ export default function Stampe() {
         .from("distribuzioni")
         .select(
           "id, data, numero_pacchi, centro, " +
-            "nuclei!inner(id, codice_fiscale, zona, archiviato, componenti(*), iscrizioni(id, numero_tessera, data_inizio, data_scadenza))",
+            "nuclei!inner(id, codice_fiscale, numero_componenti, zona, archiviato, componenti(*), iscrizioni(id, numero_tessera, data_inizio, data_scadenza))",
         )
         .order("data", { ascending: false });
       setDistRows((data as DistWithNucleoRaw[] | null) ?? []);
@@ -658,6 +721,114 @@ export default function Stampe() {
       return consegneSortDir === "asc" ? cmp : -cmp;
     });
 
+  const riepilogoDateColumns = [...selectedRiepilogoDates].sort((a, b) =>
+    a.localeCompare(b),
+  );
+
+  const riepilogoRows = useMemo<RiepilogoDistribuzioniRow[]>(() => {
+    if (riepilogoDateColumns.length === 0) return [];
+
+    const firstSelectedDate = riepilogoDateColumns[0];
+    const filteredRows = distRows.filter((row) => {
+      if (!row.nuclei || row.nuclei.archiviato) return false;
+      if (filterZona !== "Tutte" && row.nuclei.zona !== filterZona) return false;
+      return true;
+    });
+
+    const previousCenters = sortCenterNames([
+      ...new Set(
+        filteredRows
+          .filter((row) => row.data < firstSelectedDate)
+          .map((row) => row.centro)
+          .filter(Boolean),
+      ),
+    ]);
+
+    const countsBySize = new Map<
+      number,
+      {
+        precedenti: Record<string, number>;
+        date: Record<string, number>;
+      }
+    >();
+
+    let maxSize = 9;
+    for (const row of filteredRows) {
+      const componentCount = normalizeComponentCount(row.nuclei);
+      if (!componentCount || componentCount < 1) continue;
+      maxSize = Math.max(maxSize, componentCount);
+
+      let target = countsBySize.get(componentCount);
+      if (!target) {
+        target = { precedenti: {}, date: {} };
+        countsBySize.set(componentCount, target);
+      }
+
+      if (row.data < firstSelectedDate) {
+        target.precedenti[row.centro] = (target.precedenti[row.centro] ?? 0) + 1;
+      } else if (riepilogoDateColumns.includes(row.data)) {
+        target.date[row.data] = (target.date[row.data] ?? 0) + 1;
+      }
+    }
+
+    const rows: RiepilogoDistribuzioniRow[] = [];
+    for (let size = 1; size <= maxSize; size += 1) {
+      const bucket = countsBySize.get(size);
+      const precedenti = Object.fromEntries(
+        previousCenters.map((center) => [center, bucket?.precedenti[center] ?? 0]),
+      );
+      const dateCounts = Object.fromEntries(
+        riepilogoDateColumns.map((date) => [date, bucket?.date[date] ?? 0]),
+      );
+      const totale =
+        Object.values(precedenti).reduce((sum, value) => sum + value, 0) +
+        Object.values(dateCounts).reduce((sum, value) => sum + value, 0);
+
+      rows.push({
+        key: `size-${size}`,
+        label: `TOTALE BORSE ${size} PERSON${size === 1 ? "A" : "E"}`,
+        componentCount: size,
+        precedenti,
+        date: dateCounts,
+        totale,
+      });
+    }
+
+    const totalPrecedenti = Object.fromEntries(
+      previousCenters.map((center) => [
+        center,
+        rows.reduce((sum, row) => sum + (row.precedenti[center] ?? 0), 0),
+      ]),
+    );
+    const totalDateCounts = Object.fromEntries(
+      riepilogoDateColumns.map((date) => [
+        date,
+        rows.reduce((sum, row) => sum + (row.date[date] ?? 0), 0),
+      ]),
+    );
+
+    rows.push({
+      key: "total",
+      label: "TOTALE",
+      componentCount: null,
+      precedenti: totalPrecedenti,
+      date: totalDateCounts,
+      totale:
+        Object.values(totalPrecedenti).reduce((sum, value) => sum + value, 0) +
+        Object.values(totalDateCounts).reduce((sum, value) => sum + value, 0),
+    });
+
+    return rows;
+  }, [distRows, filterZona, riepilogoDateColumns]);
+
+  const riepilogoPreviousCenters = useMemo(
+    () =>
+      riepilogoRows.length > 0
+        ? Object.keys(riepilogoRows[0].precedenti)
+        : ([] as string[]),
+    [riepilogoRows],
+  );
+
   const allComponenti = nuclei.flatMap((n) => n.componenti);
 
   const fasciaCount: Record<string, number> = {};
@@ -817,6 +988,7 @@ export default function Stampe() {
         >
           <Tab label="Lista Nuclei" />
           <Tab label="Ultime Distribuzioni" />
+          <Tab label="Riepilogo Distribuzioni" />
           <Tab label="Report FSE+" />
           <Tab label="Esporta CSV" />
           <Tab label="Storico Nucleo" />
@@ -1163,6 +1335,244 @@ export default function Stampe() {
           {tab === 2 && (
             <Box>
               <Box
+                className="no-print"
+                sx={{
+                  display: "flex",
+                  gap: 2,
+                  mb: 2,
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                }}
+              >
+                <FormControl size="small" sx={{ minWidth: 180 }}>
+                  <InputLabel>Zona</InputLabel>
+                  <Select
+                    value={filterZona}
+                    label="Zona"
+                    onChange={(e) => setFilterZona(e.target.value)}
+                  >
+                    <MenuItem value="Tutte">Tutte</MenuItem>
+                    {ZONE.map((z) => (
+                      <MenuItem key={z} value={z}>
+                        {z}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <Autocomplete
+                  multiple
+                  size="small"
+                  options={availableDistribuzioneDates}
+                  value={selectedRiepilogoDates}
+                  onChange={(_, newValue) => setSelectedRiepilogoDates(newValue)}
+                  getOptionLabel={(option) => fmtData(option)}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Date distribuzione"
+                      placeholder="Seleziona date"
+                    />
+                  )}
+                  sx={{ minWidth: 320, flex: 1, maxWidth: 680 }}
+                  renderTags={(value, getTagProps) =>
+                    value.map((option, index) => (
+                      <Chip
+                        label={fmtData(option)}
+                        {...getTagProps({ index })}
+                        size="small"
+                      />
+                    ))
+                  }
+                />
+                <Typography variant="body2" color="text.secondary">
+                  {riepilogoDateColumns.length} date
+                </Typography>
+                <Box sx={{ flexGrow: 1 }} />
+                <Button
+                  variant="contained"
+                  startIcon={<PrintIcon />}
+                  onClick={() => window.print()}
+                  disabled={riepilogoDateColumns.length === 0}
+                >
+                  Stampa
+                </Button>
+              </Box>
+
+              <Typography
+                variant="h6"
+                sx={{
+                  mb: 2,
+                  display: "none",
+                  "@media print": { display: "block" },
+                }}
+              >
+                Riepilogo distribuzioni per composizione nucleo
+                {filterZona !== "Tutte" ? ` â€” Zona ${filterZona}` : ""}
+                {" â€” "}
+                {riepilogoDateColumns.length > 0
+                  ? riepilogoDateColumns.map((value) => fmtData(value)).join(", ")
+                  : "nessuna data selezionata"}
+                {" â€” "}
+                {new Date().toLocaleDateString("it-IT")}
+              </Typography>
+
+              {loadingDistribuzioni ? (
+                <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
+                  <CircularProgress />
+                </Box>
+              ) : riepilogoDateColumns.length === 0 ? (
+                <Alert severity="info">
+                  Seleziona almeno una data di distribuzione per generare il
+                  riepilogo.
+                </Alert>
+              ) : (
+                <TableContainer
+                  component={Paper}
+                  elevation={1}
+                  sx={{
+                    overflowX: "auto",
+                    "@media print": {
+                      overflow: "visible",
+                    },
+                  }}
+                >
+                  <Table
+                    size="small"
+                    sx={{
+                      minWidth: 980,
+                      "& th, & td": {
+                        border: "1px solid",
+                        borderColor: "grey.400",
+                      },
+                      "@media print": {
+                        minWidth: "auto",
+                        "& th, & td": {
+                          borderColor: "common.black",
+                          fontSize: "0.75rem",
+                          px: 0.75,
+                          py: 0.5,
+                        },
+                      },
+                    }}
+                  >
+                    <TableHead>
+                      <TableRow>
+                        <TableCell
+                          rowSpan={2}
+                          sx={{
+                            fontWeight: 700,
+                            minWidth: 240,
+                            backgroundColor: "grey.100",
+                          }}
+                        >
+                          Gruppo
+                        </TableCell>
+                        {riepilogoPreviousCenters.length > 0 && (
+                          <TableCell
+                            align="center"
+                            colSpan={riepilogoPreviousCenters.length}
+                            sx={{ fontWeight: 700, backgroundColor: "grey.100" }}
+                          >
+                            Precedenti
+                          </TableCell>
+                        )}
+                        <TableCell
+                          align="center"
+                          colSpan={riepilogoDateColumns.length}
+                          sx={{ fontWeight: 700, backgroundColor: "grey.100" }}
+                        >
+                          Date selezionate
+                        </TableCell>
+                        <TableCell
+                          rowSpan={2}
+                          align="center"
+                          sx={{ fontWeight: 700, backgroundColor: "grey.100" }}
+                        >
+                          Totale
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        {riepilogoPreviousCenters.map((center) => (
+                          <TableCell
+                            key={center}
+                            align="center"
+                            sx={{ fontWeight: 700, backgroundColor: "grey.50" }}
+                          >
+                            {center}
+                          </TableCell>
+                        ))}
+                        {riepilogoDateColumns.map((date) => (
+                          <TableCell
+                            key={date}
+                            align="center"
+                            sx={{ fontWeight: 700, backgroundColor: "grey.50" }}
+                          >
+                            {fmtData(date)}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {riepilogoRows.map((row, index) => {
+                        const isTotal = row.key === "total";
+                        return (
+                          <TableRow
+                            key={row.key}
+                            sx={{
+                              backgroundColor: isTotal
+                                ? "grey.100"
+                                : index % 2 === 0
+                                  ? "transparent"
+                                  : "action.hover",
+                            }}
+                          >
+                            <TableCell sx={{ fontWeight: isTotal ? 700 : 500 }}>
+                              {row.label}
+                            </TableCell>
+                            {riepilogoPreviousCenters.map((center) => (
+                              <TableCell key={`${row.key}-${center}`} align="center">
+                                {row.precedenti[center] || ""}
+                              </TableCell>
+                            ))}
+                            {riepilogoDateColumns.map((date) => (
+                              <TableCell key={`${row.key}-${date}`} align="center">
+                                {row.date[date] || ""}
+                              </TableCell>
+                            ))}
+                            <TableCell
+                              align="center"
+                              sx={{ fontWeight: isTotal ? 700 : 500 }}
+                            >
+                              {row.totale || ""}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      {riepilogoRows.length === 0 && (
+                        <TableRow>
+                          <TableCell
+                            colSpan={
+                              2 +
+                              riepilogoPreviousCenters.length +
+                              riepilogoDateColumns.length
+                            }
+                            align="center"
+                            sx={{ py: 4, color: "text.secondary" }}
+                          >
+                            Nessuna distribuzione trovata per i criteri selezionati.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </Box>
+          )}
+
+          {tab === 3 && (
+            <Box>
+              <Box
                 sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}
                 className="no-print"
               >
@@ -1384,7 +1794,7 @@ export default function Stampe() {
           )}
 
           {/* ═══════════════ TAB 2 — Esporta CSV ═══════════════ */}
-          {tab === 3 && (
+          {tab === 4 && (
             <Box>
               <Paper elevation={1} sx={{ p: 3, maxWidth: 600 }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
@@ -1454,7 +1864,7 @@ export default function Stampe() {
             </Box>
           )}
           {/* ═══════════════ TAB 4 — Storico Nucleo ═══════════════ */}
-          {tab === 4 && (
+          {tab === 5 && (
             <Box>
               <Box sx={{ mb: 3 }} className="no-print">
                 <Autocomplete
