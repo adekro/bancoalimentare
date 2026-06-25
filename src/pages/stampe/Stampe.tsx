@@ -4,6 +4,7 @@ import {
   Autocomplete,
   Box,
   Button,
+  Checkbox,
   Chip,
   CircularProgress,
   Dialog,
@@ -11,6 +12,7 @@ import {
   DialogContent,
   DialogTitle,
   FormControl,
+  FormControlLabel,
   Grid,
   InputLabel,
   MenuItem,
@@ -157,6 +159,19 @@ type RiepilogoDistribuzioniRow = {
   key: string;
   label: string;
   componentCount: number | null;
+  precedenti: Record<string, number>;
+  dateValues: Record<string, number>;
+};
+
+type RiepilogoDettaglioRow = {
+  key: string;
+  luogo: string;
+  cognome: string;
+  nome: string;
+  tesseraPrecedente: string;
+  tesseraAttuale: string;
+  scadenzaTessera: string;
+  componenti: number | null;
   precedenti: Record<string, number>;
   dateValues: Record<string, number>;
 };
@@ -347,6 +362,12 @@ function getUltimaIscrizione(iscrizioni: Iscrizione[]): Iscrizione | undefined {
   )[0];
 }
 
+function getPenultimaIscrizione(iscrizioni: Iscrizione[]): Iscrizione | undefined {
+  return [...iscrizioni].sort((a, b) =>
+    (b.data_inizio ?? "").localeCompare(a.data_inizio ?? ""),
+  )[1];
+}
+
 function calcFascia(dataNascita: string | null): string {
   if (!dataNascita) return "?";
   const anni = Math.floor(
@@ -447,6 +468,7 @@ export default function Stampe() {
   const [selectedRiepilogoDates, setSelectedRiepilogoDates] = useState<
     RiepilogoDateOption[]
   >([]);
+  const [riepilogoDettaglioMode, setRiepilogoDettaglioMode] = useState(false);
   const [riepilogoDialogOpen, setRiepilogoDialogOpen] = useState(false);
   const [riepilogoManualDate, setRiepilogoManualDate] = useState("");
   const [riepilogoManualCenter, setRiepilogoManualCenter] =
@@ -870,6 +892,75 @@ export default function Stampe() {
     return rows;
   }, [distRows, filterZona, riepilogoDateColumns]);
 
+  const riepilogoDettaglioRows = useMemo<RiepilogoDettaglioRow[]>(() => {
+    if (riepilogoDateColumns.length === 0) return [];
+
+    const selectedRealDates = riepilogoDateColumns.filter((item) => Boolean(item.date));
+    const firstSelectedDate = selectedRealDates[0]?.date ?? null;
+    const filteredRows = distRows.filter((row) => {
+      if (!row.nuclei || row.nuclei.archiviato) return false;
+      if (filterZona !== "Tutte" && row.nuclei.zona !== filterZona) return false;
+      return true;
+    });
+
+    const previousCenters = sortCenterNames([
+      ...new Set(
+        filteredRows
+          .filter((row) => !firstSelectedDate || row.data < firstSelectedDate)
+          .map((row) => row.centro)
+          .filter(Boolean),
+      ),
+    ]);
+
+    const byNucleo = new Map<string, RiepilogoDettaglioRow>();
+
+    for (const row of filteredRows) {
+      const nucleo = row.nuclei;
+      if (!nucleo) continue;
+      const titolare = getTitolare(nucleo.componenti);
+      const ultima = getUltimaIscrizione(nucleo.iscrizioni);
+      const penultima = getPenultimaIscrizione(nucleo.iscrizioni);
+      const componenti = normalizeComponentCount(nucleo);
+      const rowSigla =
+        CENTRO_SIGLA[row.centro] ?? row.centro.slice(0, 1).toUpperCase();
+      const rowDateKey = `${row.data}|${rowSigla}`;
+
+      let entry = byNucleo.get(nucleo.id);
+      if (!entry) {
+        entry = {
+          key: nucleo.id,
+          luogo: nucleo.zona,
+          cognome: titolare?.cognome ?? "",
+          nome: titolare?.nome ?? "",
+          tesseraPrecedente: penultima?.numero_tessera ?? "",
+          tesseraAttuale: ultima?.numero_tessera ?? "",
+          scadenzaTessera: fmtData(ultima?.data_scadenza),
+          componenti,
+          precedenti: Object.fromEntries(previousCenters.map((center) => [center, 0])),
+          dateValues: Object.fromEntries(
+            riepilogoDateColumns.map((item) => [item.key, 0]),
+          ),
+        };
+        byNucleo.set(nucleo.id, entry);
+      }
+
+      if (firstSelectedDate && row.data < firstSelectedDate) {
+        entry.precedenti[row.centro] = (entry.precedenti[row.centro] ?? 0) + 1;
+      }
+      if (riepilogoDateColumns.some((item) => item.key === rowDateKey)) {
+        entry.dateValues[rowDateKey] = (entry.dateValues[rowDateKey] ?? 0) + 1;
+      }
+    }
+
+    return [...byNucleo.values()].sort((a, b) => {
+      const luogoCmp = a.luogo.localeCompare(b.luogo, "it", { sensitivity: "base" });
+      if (luogoCmp !== 0) return luogoCmp;
+      const cognomeCmp = a.cognome.localeCompare(b.cognome, "it", { sensitivity: "base" });
+      if (cognomeCmp !== 0) return cognomeCmp;
+      return a.nome.localeCompare(b.nome, "it", { sensitivity: "base" });
+    });
+  }, [distRows, filterZona, riepilogoDateColumns]);
+
   const allComponenti = nuclei.flatMap((n) => n.componenti);
 
   const fasciaCount: Record<string, number> = {};
@@ -1007,7 +1098,13 @@ export default function Stampe() {
   }
 
   function esportaRiepilogoDistribuzioniDoc() {
-    if (riepilogoDateColumns.length === 0 || riepilogoRows.length === 0) return;
+    if (
+      riepilogoDateColumns.length === 0 ||
+      (!riepilogoDettaglioMode && riepilogoRows.length === 0) ||
+      (riepilogoDettaglioMode && riepilogoDettaglioRows.length === 0)
+    ) {
+      return;
+    }
 
     const orderedCenters = ["Duomo", "Medassino", "Pombio", "San Rocco"];
     const previousValues = orderedCenters.map((center) => ({
@@ -1026,12 +1123,37 @@ export default function Stampe() {
           : `Zona: ${filterZona}`,
       dateLabels: riepilogoDateColumns.map((item) => item.label),
       previousLegend: "PRECEDENTI",
+      detailHeaders: riepilogoDettaglioMode
+        ? [
+            "LUOGO",
+            "COGNOMI",
+            "NOMI",
+            "TESSERA PREC.",
+            "TESSERA ATT.",
+            "SCADENZA",
+            "COMP.",
+          ]
+        : undefined,
       previousValues,
-      righe: riepilogoRows.map((row) => ({
-        label: row.label,
-        previousValues: orderedCenters.map((center) => row.precedenti[center] ?? 0),
-        dateValues: riepilogoDateColumns.map((item) => row.dateValues[item.key] ?? null),
-      })),
+      righe: riepilogoDettaglioMode
+        ? riepilogoDettaglioRows.map((row) => ({
+            leftValues: [
+              row.luogo,
+              row.cognome,
+              row.nome,
+              row.tesseraPrecedente,
+              row.tesseraAttuale,
+              row.scadenzaTessera,
+              row.componenti ?? "",
+            ],
+            previousValues: orderedCenters.map((center) => row.precedenti[center] ?? 0),
+            dateValues: riepilogoDateColumns.map((item) => row.dateValues[item.key] ?? null),
+          }))
+        : riepilogoRows.map((row) => ({
+            leftValues: [row.label],
+            previousValues: orderedCenters.map((center) => row.precedenti[center] ?? 0),
+            dateValues: riepilogoDateColumns.map((item) => row.dateValues[item.key] ?? null),
+          })),
     });
   }
 
@@ -1479,6 +1601,15 @@ export default function Stampe() {
                 <Typography variant="body2" color="text.secondary">
                   {riepilogoDateColumns.length} date
                 </Typography>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={riepilogoDettaglioMode}
+                      onChange={(e) => setRiepilogoDettaglioMode(e.target.checked)}
+                    />
+                  }
+                  label="Dettaglio famiglie"
+                />
                 <Button
                   variant="outlined"
                   onClick={() => setRiepilogoDialogOpen(true)}
@@ -1523,7 +1654,10 @@ export default function Stampe() {
                     {riepilogoDateColumns.map((item) => item.label).join(", ")}
                   </Typography>
                   <Typography variant="body2">
-                    <strong>Righe generate:</strong> {riepilogoRows.length}
+                    <strong>Righe generate:</strong>{" "}
+                    {riepilogoDettaglioMode
+                      ? riepilogoDettaglioRows.length
+                      : riepilogoRows.length}
                   </Typography>
                 </Paper>
               )}

@@ -129,9 +129,10 @@ export type RiepilogoDocConfig = {
   zonaLabel: string;
   dateLabels: string[];
   previousLegend: string;
+  detailHeaders?: string[];
   previousValues: Array<{ label: string; value: number | null }>;
   righe: Array<{
-    label: string;
+    leftValues: Array<string | number | null>;
     previousValues: Array<number | null>;
     dateValues: Array<number | null>;
   }>;
@@ -142,15 +143,20 @@ export function exportRiepilogoDistribuzioniDocXml(
 ): void {
   const sheetName = config.sheetName ?? "Riepilogo";
   const totalDateColumns = Math.max(config.dateLabels.length, 1);
-  const totalColumns = 1 + config.previousValues.length + totalDateColumns;
+  const leftColumnCount = Math.max(config.detailHeaders?.length ?? 1, 1);
+  const totalColumns =
+    leftColumnCount + config.previousValues.length + totalDateColumns;
 
   const columnsXml = [
-    '<Column ss:Index="1" ss:Width="210"/>',
+    ...Array.from({ length: leftColumnCount }, (_, index) => {
+      const widths = [80, 120, 120, 65, 65, 75, 55];
+      return `<Column ss:Index="${index + 1}" ss:Width="${widths[index] ?? 210}"/>`;
+    }),
     ...config.previousValues.map(
-      (_, index) => `<Column ss:Index="${index + 2}" ss:Width="38"/>`,
+      (_, index) => `<Column ss:Index="${leftColumnCount + index + 1}" ss:Width="38"/>`,
     ),
     ...Array.from({ length: totalDateColumns }, (_, index) => {
-      const xmlIndex = 2 + config.previousValues.length + index;
+      const xmlIndex = leftColumnCount + 1 + config.previousValues.length + index;
       return `<Column ss:Index="${xmlIndex}" ss:Width="52"/>`;
     }),
   ].join("");
@@ -179,7 +185,12 @@ export function exportRiepilogoDistribuzioniDocXml(
     {
       height: 18,
       cells: [
-        { value: "GRUPPO", styleId: "headerLeft", mergeDown: 2 },
+        {
+          value: config.detailHeaders?.[0] ?? "GRUPPO",
+          styleId: "headerLeft",
+          mergeDown: 2,
+          mergeAcross: leftColumnCount - 1,
+        },
         {
           value: config.previousLegend,
           styleId: "headerCenter",
@@ -195,8 +206,18 @@ export function exportRiepilogoDistribuzioniDocXml(
     {
       height: 18,
       cells: [
+        ...(config.detailHeaders
+          ? config.detailHeaders.slice(1).map((header, index) => ({
+              index: index === 0 ? 2 : undefined,
+              value: header,
+              styleId: "headerSmall",
+            }))
+          : []),
         ...config.previousValues.map((item) => ({
-          index: item === config.previousValues[0] ? 2 : undefined,
+          index:
+            item === config.previousValues[0]
+              ? leftColumnCount + 1
+              : undefined,
           value: item.label,
           styleId: "headerSmall",
         })),
@@ -215,8 +236,18 @@ export function exportRiepilogoDistribuzioniDocXml(
     {
       height: 18,
       cells: [
+        ...(config.detailHeaders
+          ? config.detailHeaders.slice(1).map((_, index) => ({
+              index: index === 0 ? 2 : undefined,
+              value: "",
+              styleId: "headerSmall",
+            }))
+          : []),
         ...config.previousValues.map((item) => ({
-          index: item === config.previousValues[0] ? 2 : undefined,
+          index:
+            item === config.previousValues[0]
+              ? leftColumnCount + 1
+              : undefined,
           value: item.value ?? "",
           styleId: "headerNumber",
           type: item.value == null ? "String" : "Number",
@@ -233,7 +264,12 @@ export function exportRiepilogoDistribuzioniDocXml(
     rows.push({
       height: 22,
       cells: [
-        { value: riga.label, styleId: "label" },
+        ...riga.leftValues.map((value, index) => ({
+          index: index === 0 ? 1 : undefined,
+          value: value ?? "",
+          styleId: index === 0 ? "label" : "labelCenter",
+          type: typeof value === "number" ? "Number" : "String",
+        })),
         ...config.previousValues.map((_, index) => {
           const value = riga.previousValues[index] ?? null;
           return {
@@ -263,6 +299,7 @@ export function exportRiepilogoDistribuzioniDocXml(
     '<Style ss:ID="headerSmall"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/></Borders><Font ss:FontName="Arial" ss:Size="8" ss:Bold="1"/></Style>',
     '<Style ss:ID="headerNumber"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/></Borders><Font ss:FontName="Arial" ss:Size="8" ss:Bold="1"/></Style>',
     '<Style ss:ID="label"><Alignment ss:Horizontal="Left" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/></Borders><Font ss:FontName="Arial" ss:Size="8"/></Style>',
+    '<Style ss:ID="labelCenter"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/></Borders><Font ss:FontName="Arial" ss:Size="8"/></Style>',
     '<Style ss:ID="number"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/></Borders><Font ss:FontName="Arial" ss:Size="8"/></Style>',
     '<Style ss:ID="dateCell"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/></Borders><Font ss:FontName="Arial" ss:Size="8"/></Style>',
   ].join("");
