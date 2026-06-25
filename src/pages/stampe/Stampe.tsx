@@ -6,6 +6,10 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
   Grid,
   InputLabel,
@@ -154,12 +158,15 @@ type RiepilogoDistribuzioniRow = {
   label: string;
   componentCount: number | null;
   precedenti: Record<string, number>;
+  dateValues: Record<string, number>;
 };
 
 type RiepilogoDateOption = {
   key: string;
   label: string;
   date: string | null;
+  center: string | null;
+  sigla: string;
 };
 
 type SortDirection = "asc" | "desc";
@@ -440,6 +447,10 @@ export default function Stampe() {
   const [selectedRiepilogoDates, setSelectedRiepilogoDates] = useState<
     RiepilogoDateOption[]
   >([]);
+  const [riepilogoDialogOpen, setRiepilogoDialogOpen] = useState(false);
+  const [riepilogoManualDate, setRiepilogoManualDate] = useState("");
+  const [riepilogoManualCenter, setRiepilogoManualCenter] =
+    useState<keyof typeof CENTRO_SIGLA>("Duomo");
 
   // Ordinamenti
   const [listaSortBy, setListaSortBy] = useState<
@@ -483,6 +494,8 @@ export default function Stampe() {
           key,
           label: `${fmtData(row.data)} ${sigla}`,
           date: row.data,
+          center: row.centro,
+          sigla,
         });
       });
 
@@ -501,7 +514,13 @@ export default function Stampe() {
         availableDistribuzioneDates.some((option) => option.key === value.key),
       );
       if (validCurrent.length > 0) return validCurrent;
-      return availableDistribuzioneDates.slice(0, 4);
+      const defaults: RiepilogoDateOption[] = [];
+      const orderedCenters = ["Duomo", "Medassino", "Pombio", "San Rocco"];
+      orderedCenters.forEach((center) => {
+        const found = availableDistribuzioneDates.find((option) => option.center === center);
+        if (found) defaults.push(found);
+      });
+      return defaults.length > 0 ? defaults : availableDistribuzioneDates.slice(0, 4);
     });
   }, [availableDistribuzioneDates]);
 
@@ -758,11 +777,10 @@ export default function Stampe() {
 
   const riepilogoRows = useMemo<RiepilogoDistribuzioniRow[]>(() => {
     const selectedRealDates = riepilogoDateColumns
-      .map((item) => item.date)
-      .filter((value): value is string => Boolean(value));
+      .filter((item) => Boolean(item.date));
     if (riepilogoDateColumns.length === 0) return [];
 
-    const firstSelectedDate = selectedRealDates[0] ?? null;
+    const firstSelectedDate = selectedRealDates[0]?.date ?? null;
     const filteredRows = distRows.filter((row) => {
       if (!row.nuclei || row.nuclei.archiviato) return false;
       if (filterZona !== "Tutte" && row.nuclei.zona !== filterZona) return false;
@@ -782,6 +800,7 @@ export default function Stampe() {
       number,
       {
         precedenti: Record<string, number>;
+        dateValues: Record<string, number>;
       }
     >();
 
@@ -793,12 +812,19 @@ export default function Stampe() {
 
       let target = countsBySize.get(componentCount);
       if (!target) {
-        target = { precedenti: {} };
+        target = { precedenti: {}, dateValues: {} };
         countsBySize.set(componentCount, target);
       }
 
-      if (row.data < firstSelectedDate) {
+      const rowSigla =
+        CENTRO_SIGLA[row.centro] ?? row.centro.slice(0, 1).toUpperCase();
+      const rowDateKey = `${row.data}|${rowSigla}`;
+
+      if (firstSelectedDate && row.data < firstSelectedDate) {
         target.precedenti[row.centro] = (target.precedenti[row.centro] ?? 0) + 1;
+      }
+      if (riepilogoDateColumns.some((item) => item.key === rowDateKey)) {
+        target.dateValues[rowDateKey] = (target.dateValues[rowDateKey] ?? 0) + 1;
       }
     }
 
@@ -808,12 +834,16 @@ export default function Stampe() {
       const precedenti = Object.fromEntries(
         previousCenters.map((center) => [center, bucket?.precedenti[center] ?? 0]),
       );
+      const dateValues = Object.fromEntries(
+        riepilogoDateColumns.map((item) => [item.key, bucket?.dateValues[item.key] ?? 0]),
+      );
 
       rows.push({
         key: `size-${size}`,
         label: `TOTALE BORSE ${size} PERSON${size === 1 ? "A" : "E"}`,
         componentCount: size,
         precedenti,
+        dateValues,
       });
     }
 
@@ -829,6 +859,12 @@ export default function Stampe() {
       label: "TOTALE",
       componentCount: null,
       precedenti: totalPrecedenti,
+      dateValues: Object.fromEntries(
+        riepilogoDateColumns.map((item) => [
+          item.key,
+          rows.reduce((sum, row) => sum + (row.dateValues[item.key] ?? 0), 0),
+        ]),
+      ),
     });
 
     return rows;
@@ -994,8 +1030,30 @@ export default function Stampe() {
       righe: riepilogoRows.map((row) => ({
         label: row.label,
         previousValues: orderedCenters.map((center) => row.precedenti[center] ?? 0),
+        dateValues: riepilogoDateColumns.map((item) => row.dateValues[item.key] ?? null),
       })),
     });
+  }
+
+  function aggiungiRiepilogoManuale() {
+    if (!riepilogoManualDate) return;
+    const sigla = CENTRO_SIGLA[riepilogoManualCenter];
+    const key = `manual:${riepilogoManualDate}|${sigla}`;
+    const nextItem: RiepilogoDateOption = {
+      key,
+      label: `${fmtData(riepilogoManualDate)} ${sigla}`,
+      date: riepilogoManualDate,
+      center: riepilogoManualCenter,
+      sigla,
+    };
+
+    setSelectedRiepilogoDates((current) => {
+      if (current.some((item) => item.key === key)) return current;
+      return [...current, nextItem];
+    });
+    setRiepilogoDialogOpen(false);
+    setRiepilogoManualDate("");
+    setRiepilogoManualCenter("Duomo");
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -1394,32 +1452,16 @@ export default function Stampe() {
                 </FormControl>
                 <Autocomplete
                   multiple
-                  freeSolo
                   size="small"
                   options={availableDistribuzioneDates}
                   value={selectedRiepilogoDates}
-                  onChange={(_, newValue) =>
-                    setSelectedRiepilogoDates(
-                      newValue.map((item) => {
-                        if (typeof item === "string") {
-                          return {
-                            key: `free:${item}`,
-                            label: item.trim(),
-                            date: null,
-                          };
-                        }
-                        return item;
-                      }),
-                    )
-                  }
-                  getOptionLabel={(option) =>
-                    typeof option === "string" ? option : option.label
-                  }
+                  onChange={(_, newValue) => setSelectedRiepilogoDates(newValue)}
+                  getOptionLabel={(option) => option.label}
                   renderInput={(params) => (
                     <TextField
                       {...params}
                       label="Date distribuzione"
-                      placeholder="Scegli o scrivi libero"
+                      placeholder="Scegli date occupate"
                     />
                   )}
                   sx={{ minWidth: 320, flex: 1, maxWidth: 680 }}
@@ -1437,6 +1479,12 @@ export default function Stampe() {
                 <Typography variant="body2" color="text.secondary">
                   {riepilogoDateColumns.length} date
                 </Typography>
+                <Button
+                  variant="outlined"
+                  onClick={() => setRiepilogoDialogOpen(true)}
+                >
+                  Aggiungi libera
+                </Button>
                 <Box sx={{ flexGrow: 1 }} />
                 <Button
                   variant="contained"
@@ -1890,6 +1938,52 @@ export default function Stampe() {
           )}
         </>
       )}
+
+      <Dialog
+        open={riepilogoDialogOpen}
+        onClose={() => setRiepilogoDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Aggiungi colonna libera</DialogTitle>
+        <DialogContent sx={{ pt: 2, display: "grid", gap: 2 }}>
+          <TextField
+            label="Data"
+            type="date"
+            value={riepilogoManualDate}
+            onChange={(e) => setRiepilogoManualDate(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            fullWidth
+          />
+          <FormControl fullWidth>
+            <InputLabel>Luogo</InputLabel>
+            <Select
+              value={riepilogoManualCenter}
+              label="Luogo"
+              onChange={(e) =>
+                setRiepilogoManualCenter(
+                  e.target.value as keyof typeof CENTRO_SIGLA,
+                )
+              }
+            >
+              <MenuItem value="Duomo">D - Duomo</MenuItem>
+              <MenuItem value="Medassino">M - Medassino</MenuItem>
+              <MenuItem value="San Rocco">S - San Rocco</MenuItem>
+              <MenuItem value="Pombio">P - Pombio</MenuItem>
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRiepilogoDialogOpen(false)}>Annulla</Button>
+          <Button
+            onClick={aggiungiRiepilogoManuale}
+            variant="contained"
+            disabled={!riepilogoManualDate}
+          >
+            Aggiungi
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

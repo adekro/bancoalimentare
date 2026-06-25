@@ -133,7 +133,7 @@ export type RiepilogoDocConfig = {
   righe: Array<{
     label: string;
     previousValues: Array<number | null>;
-    showDateCells?: boolean;
+    dateValues: Array<number | null>;
   }>;
 };
 
@@ -242,10 +242,14 @@ export function exportRiepilogoDistribuzioniDocXml(
             type: value == null ? "String" : "Number",
           };
         }),
-        ...Array.from({ length: totalDateColumns }).map(() => ({
-          value: "",
-          styleId: riga.showDateCells === false ? "emptyBlocked" : "dateCell",
-        })),
+        ...Array.from({ length: totalDateColumns }).map((_, index) => {
+          const value = riga.dateValues[index] ?? null;
+          return {
+            value: value ?? "",
+            styleId: value == null ? "dateCell" : "number",
+            type: value == null ? "String" : "Number",
+          };
+        }),
       ],
     });
   });
@@ -261,7 +265,6 @@ export function exportRiepilogoDistribuzioniDocXml(
     '<Style ss:ID="label"><Alignment ss:Horizontal="Left" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/></Borders><Font ss:FontName="Arial" ss:Size="8"/></Style>',
     '<Style ss:ID="number"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/></Borders><Font ss:FontName="Arial" ss:Size="8"/></Style>',
     '<Style ss:ID="dateCell"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/></Borders><Font ss:FontName="Arial" ss:Size="8"/></Style>',
-    '<Style ss:ID="emptyBlocked"><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/></Borders></Style>',
   ].join("");
 
   const xml = [
