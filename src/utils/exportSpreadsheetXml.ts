@@ -4,6 +4,7 @@ export type SpreadsheetColumn<T> = {
 };
 
 type XmlCell = {
+  index?: number;
   value?: string | number | null;
   styleId?: string;
   mergeAcross?: number;
@@ -84,6 +85,9 @@ export function exportSpreadsheetXml<T>(
 
 function buildCellXml(cell: XmlCell): string {
   const attrs: string[] = [];
+  if (typeof cell.index === "number" && cell.index > 0) {
+    attrs.push(` ss:Index="${cell.index}"`);
+  }
   if (cell.styleId) attrs.push(` ss:StyleID="${xmlEscape(cell.styleId)}"`);
   if (typeof cell.mergeAcross === "number" && cell.mergeAcross > 0) {
     attrs.push(` ss:MergeAcross="${cell.mergeAcross}"`);
@@ -192,6 +196,7 @@ export function exportRiepilogoDistribuzioniDocXml(
       height: 18,
       cells: [
         ...config.previousValues.map((item) => ({
+          index: item === config.previousValues[0] ? 2 : undefined,
           value: item.label,
           styleId: "headerSmall",
         })),
@@ -211,6 +216,7 @@ export function exportRiepilogoDistribuzioniDocXml(
       height: 18,
       cells: [
         ...config.previousValues.map((item) => ({
+          index: item === config.previousValues[0] ? 2 : undefined,
           value: item.value ?? "",
           styleId: "headerNumber",
           type: item.value == null ? "String" : "Number",
@@ -268,7 +274,7 @@ export function exportRiepilogoDistribuzioniDocXml(
     ' xmlns:html="http://www.w3.org/TR/REC-html40">',
     `<Styles>${styles}</Styles>`,
     `<Worksheet ss:Name="${xmlEscape(sheetName)}">`,
-    `<Table>${columnsXml}${rows.map(buildRowXml).join("")}</Table>`,
+    `<Table ss:ExpandedColumnCount="${totalColumns}" ss:ExpandedRowCount="${rows.length}">${columnsXml}${rows.map(buildRowXml).join("")}</Table>`,
     '<WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel"><PageSetup><Layout x:Orientation="Landscape"/></PageSetup><Selected/><ProtectObjects>False</ProtectObjects><ProtectScenarios>False</ProtectScenarios></WorksheetOptions>',
     "</Worksheet>",
     "</Workbook>",
