@@ -141,187 +141,95 @@ export type RiepilogoDocConfig = {
 export function exportRiepilogoDistribuzioniDocXml(
   config: RiepilogoDocConfig,
 ): void {
-  const sheetName = config.sheetName ?? "Riepilogo";
   const totalDateColumns = Math.max(config.dateLabels.length, 1);
   const leftColumnCount = Math.max(config.detailHeaders?.length ?? 1, 1);
-  const totalColumns =
-    leftColumnCount + config.previousValues.length + totalDateColumns;
+  const leftHeaders = config.detailHeaders ?? ["GRUPPO"];
+  const css = `
+    body { font-family: Arial, sans-serif; }
+    table { border-collapse: collapse; }
+    td, th {
+      border: 1px solid #000;
+      font-size: 10px;
+      padding: 4px 6px;
+      text-align: center;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    .title { font-size: 18px; font-weight: 700; text-align: left; border: 0; padding: 2px 0 8px; }
+    .subtitle { font-size: 11px; text-align: left; border: 0; padding: 0 0 8px; }
+    .left { text-align: left; }
+    .section { font-weight: 700; background: #f2f2f2; }
+    .empty { min-width: 52px; height: 22px; }
+    .w-wide { min-width: 210px; }
+    .w-mid { min-width: 100px; }
+    .w-small { min-width: 55px; }
+  `;
 
-  const columnsXml = [
-    ...Array.from({ length: leftColumnCount }, (_, index) => {
-      const widths = [80, 120, 120, 65, 65, 75, 55];
-      return `<Column ss:Index="${index + 1}" ss:Width="${widths[index] ?? 210}"/>`;
-    }),
-    ...config.previousValues.map(
-      (_, index) => `<Column ss:Index="${leftColumnCount + index + 1}" ss:Width="38"/>`,
-    ),
-    ...Array.from({ length: totalDateColumns }, (_, index) => {
-      const xmlIndex = leftColumnCount + 1 + config.previousValues.length + index;
-      return `<Column ss:Index="${xmlIndex}" ss:Width="52"/>`;
-    }),
-  ].join("");
+  const htmlEscape = (value: string | number | null | undefined) =>
+    value == null ? "" : String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
 
-  const rows: XmlRow[] = [
-    {
-      height: 24,
-      cells: [
-        {
-          value: config.titolo,
-          styleId: "title",
-          mergeAcross: totalColumns - 1,
-        },
-      ],
-    },
-    {
-      height: 20,
-      cells: [
-        {
-          value: config.zonaLabel,
-          styleId: "subtitle",
-          mergeAcross: totalColumns - 1,
-        },
-      ],
-    },
-    {
-      height: 18,
-      cells: [
-        {
-          index: 1,
-          value: config.detailHeaders?.[0] ?? "GRUPPO",
-          styleId: "headerLeft",
-          mergeDown: 2,
-          mergeAcross: leftColumnCount - 1,
-        },
-        {
-          index: leftColumnCount + 1,
-          value: config.previousLegend,
-          styleId: "headerCenter",
-          mergeAcross: Math.max(config.previousValues.length - 1, 0),
-        },
-        {
-          index: leftColumnCount + config.previousValues.length + 1,
-          value: "DATE DA COMPILARE A MANO",
-          styleId: "headerCenter",
-          mergeAcross: totalDateColumns - 1,
-        },
-      ],
-    },
-    {
-      height: 18,
-      cells: [
-        ...(config.detailHeaders
-          ? config.detailHeaders.slice(1).map((header, index) => ({
-              index: index === 0 ? 2 : undefined,
-              value: header,
-              styleId: "headerSmall",
-            }))
-          : []),
-        ...config.previousValues.map((item) => ({
-          index:
-            item === config.previousValues[0]
-              ? leftColumnCount + 1
-              : undefined,
-          value: item.label,
-          styleId: "headerSmall",
-        })),
-        ...config.dateLabels.map((label) => ({
-          value: label,
-          styleId: "headerSmall",
-        })),
-        ...Array.from({
-          length: Math.max(0, totalDateColumns - config.dateLabels.length),
-        }).map(() => ({
-          value: "",
-          styleId: "headerSmall",
-        })),
-      ],
-    },
-    {
-      height: 18,
-      cells: [
-        ...(config.detailHeaders
-          ? config.detailHeaders.slice(1).map((_, index) => ({
-              index: index === 0 ? 2 : undefined,
-              value: "",
-              styleId: "headerSmall",
-            }))
-          : []),
-        ...config.previousValues.map((item) => ({
-          index:
-            item === config.previousValues[0]
-              ? leftColumnCount + 1
-              : undefined,
-          value: item.value ?? "",
-          styleId: "headerNumber",
-          type: item.value == null ? "String" : "Number",
-        })),
-        ...Array.from({ length: totalDateColumns }).map(() => ({
-          value: "",
-          styleId: "dateCell",
-        })),
-      ],
-    },
-  ];
+  const titleColspan = leftColumnCount + config.previousValues.length + totalDateColumns;
 
-  config.righe.forEach((riga) => {
-    rows.push({
-      height: 22,
-      cells: [
-        ...riga.leftValues.map((value, index) => ({
-          index: index === 0 ? 1 : undefined,
-          value: value ?? "",
-          styleId: index === 0 ? "label" : "labelCenter",
-          type: typeof value === "number" ? "Number" : "String",
-        })),
-        ...config.previousValues.map((_, index) => {
-          const value = riga.previousValues[index] ?? null;
-          return {
-            value: value ?? "",
-            styleId: "number",
-            type: value == null ? "String" : "Number",
-          };
-        }),
-        ...Array.from({ length: totalDateColumns }).map((_, index) => {
-          const value = riga.dateValues[index] ?? null;
-          return {
-            value: value ?? "",
-            styleId: value == null ? "dateCell" : "number",
-            type: value == null ? "String" : "Number",
-          };
-        }),
-      ],
-    });
-  });
+  const headerRow1 = `
+    <tr>
+      <th class="section left" colspan="${leftColumnCount}" rowspan="3">${htmlEscape(leftHeaders[0])}</th>
+      <th class="section" colspan="${config.previousValues.length}">${htmlEscape(config.previousLegend)}</th>
+      <th class="section" colspan="${totalDateColumns}">DATE DA COMPILARE A MANO</th>
+    </tr>
+  `;
 
-  const styles = [
-    '<Style ss:ID="Default" ss:Name="Normal"><Alignment ss:Vertical="Center"/><Borders/><Font ss:FontName="Arial" ss:Size="9"/><Interior/><NumberFormat/><Protection/></Style>',
-    '<Style ss:ID="title"><Alignment ss:Horizontal="Left" ss:Vertical="Center"/><Font ss:FontName="Arial" ss:Size="14" ss:Bold="1"/></Style>',
-    '<Style ss:ID="subtitle"><Alignment ss:Horizontal="Left" ss:Vertical="Center"/><Font ss:FontName="Arial" ss:Size="9"/></Style>',
-    '<Style ss:ID="headerLeft"><Alignment ss:Horizontal="Left" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/></Borders><Font ss:FontName="Arial" ss:Size="8" ss:Bold="1"/></Style>',
-    '<Style ss:ID="headerCenter"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/></Borders><Font ss:FontName="Arial" ss:Size="8" ss:Bold="1"/></Style>',
-    '<Style ss:ID="headerSmall"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/></Borders><Font ss:FontName="Arial" ss:Size="8" ss:Bold="1"/></Style>',
-    '<Style ss:ID="headerNumber"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/></Borders><Font ss:FontName="Arial" ss:Size="8" ss:Bold="1"/></Style>',
-    '<Style ss:ID="label"><Alignment ss:Horizontal="Left" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/></Borders><Font ss:FontName="Arial" ss:Size="8"/></Style>',
-    '<Style ss:ID="labelCenter"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/></Borders><Font ss:FontName="Arial" ss:Size="8"/></Style>',
-    '<Style ss:ID="number"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/></Borders><Font ss:FontName="Arial" ss:Size="8"/></Style>',
-    '<Style ss:ID="dateCell"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/></Borders><Font ss:FontName="Arial" ss:Size="8"/></Style>',
-  ].join("");
+  const leftHeaderCells = leftHeaders.slice(1).map((header) =>
+    `<th class="section">${htmlEscape(header)}</th>`,
+  ).join("");
+  const previousHeaderCells = config.previousValues.map((item) =>
+    `<th class="section">${htmlEscape(item.label)}</th>`,
+  ).join("");
+  const dateHeaderCells = config.dateLabels.map((label) =>
+    `<th class="section">${htmlEscape(label)}</th>`,
+  ).join("");
 
-  const xml = [
-    '<?xml version="1.0"?>',
-    '<?mso-application progid="Excel.Sheet"?>',
-    '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"',
-    ' xmlns:o="urn:schemas-microsoft-com:office:office"',
-    ' xmlns:x="urn:schemas-microsoft-com:office:excel"',
-    ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"',
-    ' xmlns:html="http://www.w3.org/TR/REC-html40">',
-    `<Styles>${styles}</Styles>`,
-    `<Worksheet ss:Name="${xmlEscape(sheetName)}">`,
-    `<Table ss:ExpandedColumnCount="${totalColumns}" ss:ExpandedRowCount="${rows.length}">${columnsXml}${rows.map(buildRowXml).join("")}</Table>`,
-    '<WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel"><PageSetup><Layout x:Orientation="Landscape"/></PageSetup><Selected/><ProtectObjects>False</ProtectObjects><ProtectScenarios>False</ProtectScenarios></WorksheetOptions>',
-    "</Worksheet>",
-    "</Workbook>",
-  ].join("");
+  const previousTotalsCells = config.previousValues.map((item) =>
+    `<td>${htmlEscape(item.value ?? "")}</td>`,
+  ).join("");
+  const emptyLeftCells = leftHeaders.slice(1).map(() => "<td></td>").join("");
+  const emptyDateCells = Array.from({ length: totalDateColumns }, () => '<td class="empty"></td>').join("");
 
-  downloadXmlDocument(config.fileName, xml);
+  const bodyRows = config.righe.map((riga) => {
+    const leftCells = riga.leftValues.map((value, index) => {
+      const cls = index === 0 ? "left" : "";
+      return `<td class="${cls}">${htmlEscape(value ?? "")}</td>`;
+    }).join("");
+    const previousCells = riga.previousValues.map((value) =>
+      `<td>${htmlEscape(value ?? "")}</td>`,
+    ).join("");
+    const dateCells = riga.dateValues.map((value) =>
+      `<td class="empty">${htmlEscape(value ?? "")}</td>`,
+    ).join("");
+    return `<tr>${leftCells}${previousCells}${dateCells}</tr>`;
+  }).join("");
+
+  const html = `
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <style>${css}</style>
+      </head>
+      <body>
+        <table>
+          <tr><td class="title" colspan="${titleColspan}">${htmlEscape(config.titolo)}</td></tr>
+          <tr><td class="subtitle" colspan="${titleColspan}">${htmlEscape(config.zonaLabel)}</td></tr>
+          ${headerRow1}
+          <tr>${leftHeaderCells}${previousHeaderCells}${dateHeaderCells}</tr>
+          <tr>${emptyLeftCells}${previousTotalsCells}${emptyDateCells}</tr>
+          ${bodyRows}
+        </table>
+      </body>
+    </html>
+  `.trim();
+
+  downloadXmlDocument(config.fileName, html);
 }
