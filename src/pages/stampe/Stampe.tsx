@@ -156,6 +156,12 @@ type RiepilogoDistribuzioniRow = {
   precedenti: Record<string, number>;
 };
 
+type RiepilogoDateOption = {
+  key: string;
+  label: string;
+  date: string | null;
+};
+
 type SortDirection = "asc" | "desc";
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -431,9 +437,9 @@ export default function Stampe() {
   const [loadingDistribuzioni, setLoadingDistribuzioni] = useState(false);
   const [distribuzioniLoaded, setDistribuzioniLoaded] = useState(false);
   const [distRows, setDistRows] = useState<DistWithNucleoRaw[]>([]);
-  const [selectedRiepilogoDates, setSelectedRiepilogoDates] = useState<string[]>(
-    [],
-  );
+  const [selectedRiepilogoDates, setSelectedRiepilogoDates] = useState<
+    RiepilogoDateOption[]
+  >([]);
 
   // Ordinamenti
   const [listaSortBy, setListaSortBy] = useState<
@@ -462,13 +468,26 @@ export default function Stampe() {
     return ["tessera", "cf", "titolare", "zona", "stato", "scadenza"];
   });
 
-  const availableDistribuzioneDates = useMemo(
-    () =>
-      [...new Set(distRows.map((row) => row.data))]
-        .filter(Boolean)
-        .sort((a, b) => b.localeCompare(a)),
-    [distRows],
-  );
+  const availableDistribuzioneDates = useMemo<RiepilogoDateOption[]>(() => {
+    const seen = new Set<string>();
+    const items: RiepilogoDateOption[] = [];
+
+    [...distRows]
+      .sort((a, b) => b.data.localeCompare(a.data) || a.centro.localeCompare(b.centro))
+      .forEach((row) => {
+        const sigla = CENTRO_SIGLA[row.centro] ?? row.centro.slice(0, 1).toUpperCase();
+        const key = `${row.data}|${sigla}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        items.push({
+          key,
+          label: `${fmtData(row.data)} ${sigla}`,
+          date: row.data,
+        });
+      });
+
+    return items;
+  }, [distRows]);
 
   useEffect(() => {
     if (availableDistribuzioneDates.length === 0) {
@@ -478,7 +497,8 @@ export default function Stampe() {
 
     setSelectedRiepilogoDates((current) => {
       const validCurrent = current.filter((value) =>
-        availableDistribuzioneDates.includes(value),
+        value.date === null ||
+        availableDistribuzioneDates.some((option) => option.key === value.key),
       );
       if (validCurrent.length > 0) return validCurrent;
       return availableDistribuzioneDates.slice(0, 4);
@@ -729,14 +749,20 @@ export default function Stampe() {
       return consegneSortDir === "asc" ? cmp : -cmp;
     });
 
-  const riepilogoDateColumns = [...selectedRiepilogoDates].sort((a, b) =>
-    a.localeCompare(b),
-  );
+  const riepilogoDateColumns = [...selectedRiepilogoDates].sort((a, b) => {
+    if (a.date && b.date) return a.date.localeCompare(b.date);
+    if (a.date) return -1;
+    if (b.date) return 1;
+    return a.label.localeCompare(b.label, "it", { sensitivity: "base" });
+  });
 
   const riepilogoRows = useMemo<RiepilogoDistribuzioniRow[]>(() => {
+    const selectedRealDates = riepilogoDateColumns
+      .map((item) => item.date)
+      .filter((value): value is string => Boolean(value));
     if (riepilogoDateColumns.length === 0) return [];
 
-    const firstSelectedDate = riepilogoDateColumns[0];
+    const firstSelectedDate = selectedRealDates[0] ?? null;
     const filteredRows = distRows.filter((row) => {
       if (!row.nuclei || row.nuclei.archiviato) return false;
       if (filterZona !== "Tutte" && row.nuclei.zona !== filterZona) return false;
@@ -746,7 +772,7 @@ export default function Stampe() {
     const previousCenters = sortCenterNames([
       ...new Set(
         filteredRows
-          .filter((row) => row.data < firstSelectedDate)
+          .filter((row) => !firstSelectedDate || row.data < firstSelectedDate)
           .map((row) => row.centro)
           .filter(Boolean),
       ),
@@ -955,14 +981,14 @@ export default function Stampe() {
     }));
 
     exportRiepilogoDistribuzioniDocXml({
-      fileName: `riepilogo_distribuzioni_${new Date().toISOString().slice(0, 10)}.doc`,
+      fileName: `riepilogo_distribuzioni_${new Date().toISOString().slice(0, 10)}.xls`,
       sheetName: "Riepilogo",
       titolo: `ELENCO FAMIGLIE ASSISTITE ${new Date().getFullYear()}`,
       zonaLabel:
         filterZona === "Tutte"
           ? "Zona: tutte"
           : `Zona: ${filterZona}`,
-      dateLabels: riepilogoDateColumns.map((date) => fmtData(date)),
+      dateLabels: riepilogoDateColumns.map((item) => item.label),
       previousLegend: "PRECEDENTI",
       previousValues,
       righe: riepilogoRows.map((row) => ({
@@ -1368,23 +1394,40 @@ export default function Stampe() {
                 </FormControl>
                 <Autocomplete
                   multiple
+                  freeSolo
                   size="small"
                   options={availableDistribuzioneDates}
                   value={selectedRiepilogoDates}
-                  onChange={(_, newValue) => setSelectedRiepilogoDates(newValue)}
-                  getOptionLabel={(option) => fmtData(option)}
+                  onChange={(_, newValue) =>
+                    setSelectedRiepilogoDates(
+                      newValue.map((item) => {
+                        if (typeof item === "string") {
+                          return {
+                            key: `free:${item}`,
+                            label: item.trim(),
+                            date: null,
+                          };
+                        }
+                        return item;
+                      }),
+                    )
+                  }
+                  getOptionLabel={(option) =>
+                    typeof option === "string" ? option : option.label
+                  }
                   renderInput={(params) => (
                     <TextField
                       {...params}
                       label="Date distribuzione"
-                      placeholder="Seleziona date"
+                      placeholder="Scegli o scrivi libero"
                     />
                   )}
                   sx={{ minWidth: 320, flex: 1, maxWidth: 680 }}
+                  isOptionEqualToValue={(option, value) => option.key === value.key}
                   renderTags={(value, getTagProps) =>
                     value.map((option, index) => (
                       <Chip
-                        label={fmtData(option)}
+                        label={option.label}
                         {...getTagProps({ index })}
                         size="small"
                       />
@@ -1401,7 +1444,7 @@ export default function Stampe() {
                   onClick={esportaRiepilogoDistribuzioniDoc}
                   disabled={riepilogoDateColumns.length === 0}
                 >
-                  Scarica .doc XML
+                  Scarica .xls XML
                 </Button>
               </Box>
 
@@ -1420,7 +1463,7 @@ export default function Stampe() {
                     Export foglio manuale
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Genera un file XML con estensione <strong>.doc</strong>,
+                    Genera un file XML con estensione <strong>.xls</strong>,
                     pensato per essere aperto in Excel e stampato.
                   </Typography>
                   <Typography variant="body2" sx={{ mb: 1 }}>
@@ -1429,7 +1472,7 @@ export default function Stampe() {
                   </Typography>
                   <Typography variant="body2" sx={{ mb: 1 }}>
                     <strong>Date nel foglio:</strong>{" "}
-                    {riepilogoDateColumns.map((date) => fmtData(date)).join(", ")}
+                    {riepilogoDateColumns.map((item) => item.label).join(", ")}
                   </Typography>
                   <Typography variant="body2">
                     <strong>Righe generate:</strong> {riepilogoRows.length}

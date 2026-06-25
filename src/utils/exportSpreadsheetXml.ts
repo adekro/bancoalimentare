@@ -108,7 +108,7 @@ function buildRowXml(row: XmlRow): string {
 
 function downloadXmlDocument(fileName: string, xml: string): void {
   const blob = new Blob([xml], {
-    type: "application/msword;charset=utf-8;",
+    type: "application/vnd.ms-excel;charset=utf-8;",
   });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
