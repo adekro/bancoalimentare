@@ -27,7 +27,10 @@ import DownloadIcon from "@mui/icons-material/Download";
 import PrintIcon from "@mui/icons-material/Print";
 import { supabase } from "@/api/supabase";
 import StatusChip from "@/components/common/StatusChip";
-import { exportSpreadsheetXml } from "@/utils/exportSpreadsheetXml";
+import {
+  exportRiepilogoDistribuzioniDocXml,
+  exportSpreadsheetXml,
+} from "@/utils/exportSpreadsheetXml";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -151,8 +154,6 @@ type RiepilogoDistribuzioniRow = {
   label: string;
   componentCount: number | null;
   precedenti: Record<string, number>;
-  date: Record<string, number>;
-  totale: number;
 };
 
 type SortDirection = "asc" | "desc";
@@ -398,6 +399,13 @@ function sortCenterNames(values: string[]): string[] {
     return a.localeCompare(b, "it", { sensitivity: "base" });
   });
 }
+
+const CENTRO_SIGLA: Record<string, string> = {
+  Duomo: "D",
+  Medassino: "M",
+  Pombio: "P",
+  "San Rocco": "S",
+};
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -748,7 +756,6 @@ export default function Stampe() {
       number,
       {
         precedenti: Record<string, number>;
-        date: Record<string, number>;
       }
     >();
 
@@ -760,14 +767,12 @@ export default function Stampe() {
 
       let target = countsBySize.get(componentCount);
       if (!target) {
-        target = { precedenti: {}, date: {} };
+        target = { precedenti: {} };
         countsBySize.set(componentCount, target);
       }
 
       if (row.data < firstSelectedDate) {
         target.precedenti[row.centro] = (target.precedenti[row.centro] ?? 0) + 1;
-      } else if (riepilogoDateColumns.includes(row.data)) {
-        target.date[row.data] = (target.date[row.data] ?? 0) + 1;
       }
     }
 
@@ -777,20 +782,12 @@ export default function Stampe() {
       const precedenti = Object.fromEntries(
         previousCenters.map((center) => [center, bucket?.precedenti[center] ?? 0]),
       );
-      const dateCounts = Object.fromEntries(
-        riepilogoDateColumns.map((date) => [date, bucket?.date[date] ?? 0]),
-      );
-      const totale =
-        Object.values(precedenti).reduce((sum, value) => sum + value, 0) +
-        Object.values(dateCounts).reduce((sum, value) => sum + value, 0);
 
       rows.push({
         key: `size-${size}`,
         label: `TOTALE BORSE ${size} PERSON${size === 1 ? "A" : "E"}`,
         componentCount: size,
         precedenti,
-        date: dateCounts,
-        totale,
       });
     }
 
@@ -800,34 +797,16 @@ export default function Stampe() {
         rows.reduce((sum, row) => sum + (row.precedenti[center] ?? 0), 0),
       ]),
     );
-    const totalDateCounts = Object.fromEntries(
-      riepilogoDateColumns.map((date) => [
-        date,
-        rows.reduce((sum, row) => sum + (row.date[date] ?? 0), 0),
-      ]),
-    );
 
     rows.push({
       key: "total",
       label: "TOTALE",
       componentCount: null,
       precedenti: totalPrecedenti,
-      date: totalDateCounts,
-      totale:
-        Object.values(totalPrecedenti).reduce((sum, value) => sum + value, 0) +
-        Object.values(totalDateCounts).reduce((sum, value) => sum + value, 0),
     });
 
     return rows;
   }, [distRows, filterZona, riepilogoDateColumns]);
-
-  const riepilogoPreviousCenters = useMemo(
-    () =>
-      riepilogoRows.length > 0
-        ? Object.keys(riepilogoRows[0].precedenti)
-        : ([] as string[]),
-    [riepilogoRows],
-  );
 
   const allComponenti = nuclei.flatMap((n) => n.componenti);
 
@@ -963,6 +942,34 @@ export default function Stampe() {
       `consegne_settore_${new Date().toISOString().slice(0, 10)}.xls`,
       "ConsegneSettore",
     );
+  }
+
+  function esportaRiepilogoDistribuzioniDoc() {
+    if (riepilogoDateColumns.length === 0 || riepilogoRows.length === 0) return;
+
+    const orderedCenters = ["Duomo", "Medassino", "Pombio", "San Rocco"];
+    const previousValues = orderedCenters.map((center) => ({
+      label: CENTRO_SIGLA[center],
+      value:
+        riepilogoRows.find((row) => row.key === "total")?.precedenti[center] ?? 0,
+    }));
+
+    exportRiepilogoDistribuzioniDocXml({
+      fileName: `riepilogo_distribuzioni_${new Date().toISOString().slice(0, 10)}.doc`,
+      sheetName: "Riepilogo",
+      titolo: `ELENCO FAMIGLIE ASSISTITE ${new Date().getFullYear()}`,
+      zonaLabel:
+        filterZona === "Tutte"
+          ? "Zona: tutte"
+          : `Zona: ${filterZona}`,
+      dateLabels: riepilogoDateColumns.map((date) => fmtData(date)),
+      previousLegend: "PRECEDENTI",
+      previousValues,
+      righe: riepilogoRows.map((row) => ({
+        label: row.label,
+        previousValues: orderedCenters.map((center) => row.precedenti[center] ?? 0),
+      })),
+    });
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -1390,31 +1397,13 @@ export default function Stampe() {
                 <Box sx={{ flexGrow: 1 }} />
                 <Button
                   variant="contained"
-                  startIcon={<PrintIcon />}
-                  onClick={() => window.print()}
+                  startIcon={<DownloadIcon />}
+                  onClick={esportaRiepilogoDistribuzioniDoc}
                   disabled={riepilogoDateColumns.length === 0}
                 >
-                  Stampa
+                  Scarica .doc XML
                 </Button>
               </Box>
-
-              <Typography
-                variant="h6"
-                sx={{
-                  mb: 2,
-                  display: "none",
-                  "@media print": { display: "block" },
-                }}
-              >
-                Riepilogo distribuzioni per composizione nucleo
-                {filterZona !== "Tutte" ? ` â€” Zona ${filterZona}` : ""}
-                {" â€” "}
-                {riepilogoDateColumns.length > 0
-                  ? riepilogoDateColumns.map((value) => fmtData(value)).join(", ")
-                  : "nessuna data selezionata"}
-                {" â€” "}
-                {new Date().toLocaleDateString("it-IT")}
-              </Typography>
 
               {loadingDistribuzioni ? (
                 <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
@@ -1426,146 +1415,26 @@ export default function Stampe() {
                   riepilogo.
                 </Alert>
               ) : (
-                <TableContainer
-                  component={Paper}
-                  elevation={1}
-                  sx={{
-                    overflowX: "auto",
-                    "@media print": {
-                      overflow: "visible",
-                    },
-                  }}
-                >
-                  <Table
-                    size="small"
-                    sx={{
-                      minWidth: 980,
-                      "& th, & td": {
-                        border: "1px solid",
-                        borderColor: "grey.400",
-                      },
-                      "@media print": {
-                        minWidth: "auto",
-                        "& th, & td": {
-                          borderColor: "common.black",
-                          fontSize: "0.75rem",
-                          px: 0.75,
-                          py: 0.5,
-                        },
-                      },
-                    }}
-                  >
-                    <TableHead>
-                      <TableRow>
-                        <TableCell
-                          rowSpan={2}
-                          sx={{
-                            fontWeight: 700,
-                            minWidth: 240,
-                            backgroundColor: "grey.100",
-                          }}
-                        >
-                          Gruppo
-                        </TableCell>
-                        {riepilogoPreviousCenters.length > 0 && (
-                          <TableCell
-                            align="center"
-                            colSpan={riepilogoPreviousCenters.length}
-                            sx={{ fontWeight: 700, backgroundColor: "grey.100" }}
-                          >
-                            Precedenti
-                          </TableCell>
-                        )}
-                        <TableCell
-                          align="center"
-                          colSpan={riepilogoDateColumns.length}
-                          sx={{ fontWeight: 700, backgroundColor: "grey.100" }}
-                        >
-                          Date selezionate
-                        </TableCell>
-                        <TableCell
-                          rowSpan={2}
-                          align="center"
-                          sx={{ fontWeight: 700, backgroundColor: "grey.100" }}
-                        >
-                          Totale
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        {riepilogoPreviousCenters.map((center) => (
-                          <TableCell
-                            key={center}
-                            align="center"
-                            sx={{ fontWeight: 700, backgroundColor: "grey.50" }}
-                          >
-                            {center}
-                          </TableCell>
-                        ))}
-                        {riepilogoDateColumns.map((date) => (
-                          <TableCell
-                            key={date}
-                            align="center"
-                            sx={{ fontWeight: 700, backgroundColor: "grey.50" }}
-                          >
-                            {fmtData(date)}
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {riepilogoRows.map((row, index) => {
-                        const isTotal = row.key === "total";
-                        return (
-                          <TableRow
-                            key={row.key}
-                            sx={{
-                              backgroundColor: isTotal
-                                ? "grey.100"
-                                : index % 2 === 0
-                                  ? "transparent"
-                                  : "action.hover",
-                            }}
-                          >
-                            <TableCell sx={{ fontWeight: isTotal ? 700 : 500 }}>
-                              {row.label}
-                            </TableCell>
-                            {riepilogoPreviousCenters.map((center) => (
-                              <TableCell key={`${row.key}-${center}`} align="center">
-                                {row.precedenti[center] || ""}
-                              </TableCell>
-                            ))}
-                            {riepilogoDateColumns.map((date) => (
-                              <TableCell key={`${row.key}-${date}`} align="center">
-                                {row.date[date] || ""}
-                              </TableCell>
-                            ))}
-                            <TableCell
-                              align="center"
-                              sx={{ fontWeight: isTotal ? 700 : 500 }}
-                            >
-                              {row.totale || ""}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                      {riepilogoRows.length === 0 && (
-                        <TableRow>
-                          <TableCell
-                            colSpan={
-                              2 +
-                              riepilogoPreviousCenters.length +
-                              riepilogoDateColumns.length
-                            }
-                            align="center"
-                            sx={{ py: 4, color: "text.secondary" }}
-                          >
-                            Nessuna distribuzione trovata per i criteri selezionati.
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                <Paper elevation={1} sx={{ p: 3 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                    Export foglio manuale
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Genera un file XML con estensione <strong>.doc</strong>,
+                    pensato per essere aperto in Excel e stampato.
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Sigle precedenti:</strong> D = Duomo, M = Medassino,
+                    P = Pombio, S = San Rocco
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Date nel foglio:</strong>{" "}
+                    {riepilogoDateColumns.map((date) => fmtData(date)).join(", ")}
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>Righe generate:</strong> {riepilogoRows.length}
+                  </Typography>
+                </Paper>
               )}
             </Box>
           )}
