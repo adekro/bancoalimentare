@@ -186,17 +186,20 @@ export function exportRiepilogoDistribuzioniDocXml(
       height: 18,
       cells: [
         {
+          index: 1,
           value: config.detailHeaders?.[0] ?? "GRUPPO",
           styleId: "headerLeft",
           mergeDown: 2,
           mergeAcross: leftColumnCount - 1,
         },
         {
+          index: leftColumnCount + 1,
           value: config.previousLegend,
           styleId: "headerCenter",
           mergeAcross: Math.max(config.previousValues.length - 1, 0),
         },
         {
+          index: leftColumnCount + config.previousValues.length + 1,
           value: "DATE DA COMPILARE A MANO",
           styleId: "headerCenter",
           mergeAcross: totalDateColumns - 1,
