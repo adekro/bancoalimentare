@@ -1688,6 +1688,18 @@ export default function ListaUtenti() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setArchivioId(null)}>Annulla</Button>
+          {!showArchiviati && (
+            <Button
+              color="error"
+              onClick={() => {
+                setEliminaDefinitivamenteId(archivioId);
+                setArchivioId(null);
+              }}
+              disabled={archiving}
+            >
+              Elimina definitivamente
+            </Button>
+          )}
           <Button
             variant="contained"
             color={showArchiviati ? "primary" : "error"}
