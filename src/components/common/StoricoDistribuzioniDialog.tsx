@@ -7,6 +7,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Alert,
   IconButton,
   Table,
   TableBody,
@@ -55,6 +56,7 @@ export default function StoricoDistribuzioniDialog({ nucleoId, nucleoLabel, onCl
   const [saving, setSaving] = useState(false)
   const [editState, setEditState] = useState<EditState | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState('')
 
   const fetchRighe = useCallback(async (nId: string) => {
     setLoading(true)
@@ -72,6 +74,7 @@ export default function StoricoDistribuzioniDialog({ nucleoId, nucleoLabel, onCl
     setRighe([])
     setEditState(null)
     setDeleteId(null)
+    setDeleteError('')
     fetchRighe(nucleoId)
   }, [nucleoId, fetchRighe])
 
@@ -104,13 +107,26 @@ export default function StoricoDistribuzioniDialog({ nucleoId, nucleoLabel, onCl
   const handleConfirmDelete = async () => {
     if (!deleteId || !nucleoId) return
     setSaving(true)
-    const { error } = await supabase.from('distribuzioni').delete().eq('id', deleteId)
+    setDeleteError('')
+    const { data, error } = await supabase
+      .from('distribuzioni')
+      .delete()
+      .eq('id', deleteId)
+      .select('id')
     setSaving(false)
-    if (!error) {
-      setDeleteId(null)
-      await fetchRighe(nucleoId)
-      onChanged?.()
+    if (error) {
+      setDeleteError(error.message)
+      return
     }
+
+    if (!data?.length) {
+      setDeleteError('La registrazione non è stata eliminata dal database.')
+      return
+    }
+
+    setDeleteId(null)
+    await fetchRighe(nucleoId)
+    onChanged?.()
   }
 
   const deleteTarget = deleteId ? righe.find((r) => r.id === deleteId) : null
@@ -224,7 +240,7 @@ export default function StoricoDistribuzioniDialog({ nucleoId, nucleoLabel, onCl
                               </IconButton>
                             </Tooltip>
                             <Tooltip title="Elimina">
-                              <IconButton size="small" color="error" onClick={() => setDeleteId(r.id)} disabled={saving}>
+                              <IconButton size="small" color="error" onClick={() => { setDeleteError(''); setDeleteId(r.id) }} disabled={saving}>
                                 <DeleteIcon fontSize="small" />
                               </IconButton>
                             </Tooltip>
@@ -248,6 +264,7 @@ export default function StoricoDistribuzioniDialog({ nucleoId, nucleoLabel, onCl
       <Dialog open={Boolean(deleteId)} onClose={() => setDeleteId(null)} maxWidth="xs" fullWidth>
         <DialogTitle>Conferma eliminazione</DialogTitle>
         <DialogContent>
+          {deleteError && <Alert severity="error" sx={{ mb: 2 }}>{deleteError}</Alert>}
           <Typography>
             Vuoi eliminare la distribuzione del{' '}
             <strong>
@@ -259,7 +276,7 @@ export default function StoricoDistribuzioniDialog({ nucleoId, nucleoLabel, onCl
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteId(null)}>Annulla</Button>
+          <Button onClick={() => { setDeleteError(''); setDeleteId(null) }}>Annulla</Button>
           <Button variant="contained" color="error" onClick={handleConfirmDelete} disabled={saving}>
             {saving ? <CircularProgress size={18} color="inherit" /> : 'Elimina'}
           </Button>

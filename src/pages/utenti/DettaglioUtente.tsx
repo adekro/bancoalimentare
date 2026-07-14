@@ -853,15 +853,23 @@ export default function DettaglioUtente() {
 
   const handleDeleteIscrizione = async (iscrizioneId: string) => {
     setDeletingIscrizioneId(iscrizioneId);
-    const { error: deleteErr } = await supabase
+    const { data: deletedIscrizioni, error: deleteErr } = await supabase
       .from("iscrizioni")
       .delete()
-      .eq("id", iscrizioneId);
+      .eq("id", iscrizioneId)
+      .select("id");
 
     setDeletingIscrizioneId(null);
 
     if (deleteErr) {
       setError(deleteErr.message);
+      return;
+    }
+
+    if (!deletedIscrizioni?.length) {
+      setError(
+        "La registrazione tessera non è stata eliminata dal database. Verifica di avere i permessi di amministratore.",
+      );
       return;
     }
 

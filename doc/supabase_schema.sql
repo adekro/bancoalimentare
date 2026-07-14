@@ -336,6 +336,7 @@ DROP POLICY IF EXISTS "access_requests: solo admin elimina" ON public.access_req
 DROP POLICY IF EXISTS "nuclei: lettura per autenticati" ON public.nuclei;
 DROP POLICY IF EXISTS "nuclei: inserimento per autenticati" ON public.nuclei;
 DROP POLICY IF EXISTS "nuclei: modifica per autenticati" ON public.nuclei;
+DROP POLICY IF EXISTS "nuclei: eliminazione per autenticati" ON public.nuclei;
 DROP POLICY IF EXISTS "nuclei: eliminazione solo admin" ON public.nuclei;
 
 DROP POLICY IF EXISTS "componenti: lettura per autenticati" ON public.componenti;
@@ -346,22 +347,31 @@ DROP POLICY IF EXISTS "componenti: eliminazione per autenticati" ON public.compo
 
 DROP POLICY IF EXISTS "iscrizioni: lettura per autenticati" ON public.iscrizioni;
 DROP POLICY IF EXISTS "iscrizioni: inserimento per autenticati" ON public.iscrizioni;
+DROP POLICY IF EXISTS "iscrizioni: modifica per autenticati" ON public.iscrizioni;
+DROP POLICY IF EXISTS "iscrizioni: eliminazione per autenticati" ON public.iscrizioni;
 DROP POLICY IF EXISTS "iscrizioni: modifica solo admin" ON public.iscrizioni;
 DROP POLICY IF EXISTS "iscrizioni: eliminazione solo admin" ON public.iscrizioni;
 
 DROP POLICY IF EXISTS "distribuzioni: lettura per autenticati" ON public.distribuzioni;
 DROP POLICY IF EXISTS "distribuzioni: inserimento per autenticati" ON public.distribuzioni;
+DROP POLICY IF EXISTS "distribuzioni: modifica per autenticati" ON public.distribuzioni;
 DROP POLICY IF EXISTS "distribuzioni: modifica solo admin" ON public.distribuzioni;
 DROP POLICY IF EXISTS "distribuzioni: modifica nota per autenticati" ON public.distribuzioni;
+DROP POLICY IF EXISTS "distribuzioni: eliminazione per autenticati" ON public.distribuzioni;
 DROP POLICY IF EXISTS "distribuzioni: eliminazione solo admin" ON public.distribuzioni;
 
 DROP POLICY IF EXISTS "articoli: lettura per autenticati" ON public.articoli;
+DROP POLICY IF EXISTS "articoli: inserimento per autenticati" ON public.articoli;
+DROP POLICY IF EXISTS "articoli: modifica per autenticati" ON public.articoli;
+DROP POLICY IF EXISTS "articoli: eliminazione per autenticati" ON public.articoli;
 DROP POLICY IF EXISTS "articoli: inserimento solo admin" ON public.articoli;
 DROP POLICY IF EXISTS "articoli: modifica solo admin" ON public.articoli;
 DROP POLICY IF EXISTS "articoli: eliminazione solo admin" ON public.articoli;
 
 DROP POLICY IF EXISTS "movimenti: lettura per autenticati" ON public.movimenti_magazzino;
 DROP POLICY IF EXISTS "movimenti: inserimento per autenticati" ON public.movimenti_magazzino;
+DROP POLICY IF EXISTS "movimenti: modifica per autenticati" ON public.movimenti_magazzino;
+DROP POLICY IF EXISTS "movimenti: eliminazione per autenticati" ON public.movimenti_magazzino;
 DROP POLICY IF EXISTS "movimenti: modifica solo admin" ON public.movimenti_magazzino;
 DROP POLICY IF EXISTS "movimenti: eliminazione solo admin" ON public.movimenti_magazzino;
 
@@ -399,10 +409,10 @@ CREATE POLICY "nuclei: modifica per autenticati"
     USING (auth.role() = 'authenticated')
     WITH CHECK (auth.role() = 'authenticated');
 
--- Eliminazione fisica solo admin; gli altri usano archiviato=TRUE
-CREATE POLICY "nuclei: eliminazione solo admin"
+-- Gli utenti autenticati possono eliminare fisicamente i nuclei.
+CREATE POLICY "nuclei: eliminazione per autenticati"
     ON public.nuclei FOR DELETE
-    USING (public.fn_is_admin());
+    USING (auth.role() = 'authenticated');
 
 -- ── componenti ───────────────────────────────────────────────
 CREATE POLICY "componenti: lettura per autenticati"
@@ -431,15 +441,15 @@ CREATE POLICY "iscrizioni: inserimento per autenticati"
     ON public.iscrizioni FOR INSERT
     WITH CHECK (auth.role() = 'authenticated');
 
--- Le iscrizioni sono append-only; solo admin può correggere o eliminare
-CREATE POLICY "iscrizioni: modifica solo admin"
+-- Gli utenti autenticati possono correggere o eliminare le iscrizioni.
+CREATE POLICY "iscrizioni: modifica per autenticati"
     ON public.iscrizioni FOR UPDATE
-    USING (public.fn_is_admin())
-    WITH CHECK (public.fn_is_admin());
+    USING (auth.role() = 'authenticated')
+    WITH CHECK (auth.role() = 'authenticated');
 
-CREATE POLICY "iscrizioni: eliminazione solo admin"
+CREATE POLICY "iscrizioni: eliminazione per autenticati"
     ON public.iscrizioni FOR DELETE
-    USING (public.fn_is_admin());
+    USING (auth.role() = 'authenticated');
 
 -- ── distribuzioni ────────────────────────────────────────────
 CREATE POLICY "distribuzioni: lettura per autenticati"
@@ -450,20 +460,12 @@ CREATE POLICY "distribuzioni: inserimento per autenticati"
     ON public.distribuzioni FOR INSERT
     WITH CHECK (auth.role() = 'authenticated');
 
--- Solo admin può correggere distribuzioni già registrate
-CREATE POLICY "distribuzioni: modifica solo admin"
-    ON public.distribuzioni FOR UPDATE
-    USING (public.fn_is_admin())
-    WITH CHECK (public.fn_is_admin());
-
--- Gli operatori autenticati possono aggiornare note operative sulla distribuzione
-CREATE POLICY "distribuzioni: modifica nota per autenticati"
+CREATE POLICY "distribuzioni: modifica per autenticati"
     ON public.distribuzioni FOR UPDATE
     USING (auth.role() = 'authenticated')
     WITH CHECK (auth.role() = 'authenticated');
 
--- Gli operatori autenticati possono annullare una distribuzione (undo/sblocco)
-CREATE POLICY "distribuzioni: eliminazione solo admin"
+CREATE POLICY "distribuzioni: eliminazione per autenticati"
     ON public.distribuzioni FOR DELETE
     USING (auth.role() = 'authenticated');
 
@@ -472,18 +474,18 @@ CREATE POLICY "articoli: lettura per autenticati"
     ON public.articoli FOR SELECT
     USING (auth.role() = 'authenticated');
 
-CREATE POLICY "articoli: inserimento solo admin"
+CREATE POLICY "articoli: inserimento per autenticati"
     ON public.articoli FOR INSERT
-    WITH CHECK (public.fn_is_admin());
+    WITH CHECK (auth.role() = 'authenticated');
 
-CREATE POLICY "articoli: modifica solo admin"
+CREATE POLICY "articoli: modifica per autenticati"
     ON public.articoli FOR UPDATE
-    USING (public.fn_is_admin())
-    WITH CHECK (public.fn_is_admin());
+    USING (auth.role() = 'authenticated')
+    WITH CHECK (auth.role() = 'authenticated');
 
-CREATE POLICY "articoli: eliminazione solo admin"
+CREATE POLICY "articoli: eliminazione per autenticati"
     ON public.articoli FOR DELETE
-    USING (public.fn_is_admin());
+    USING (auth.role() = 'authenticated');
 
 -- ── movimenti_magazzino ──────────────────────────────────────
 CREATE POLICY "movimenti: lettura per autenticati"
@@ -494,15 +496,15 @@ CREATE POLICY "movimenti: inserimento per autenticati"
     ON public.movimenti_magazzino FOR INSERT
     WITH CHECK (auth.role() = 'authenticated');
 
--- I movimenti non si modificano: solo admin può correggere in casi eccezionali
-CREATE POLICY "movimenti: modifica solo admin"
+-- Gli utenti autenticati possono correggere o eliminare i movimenti.
+CREATE POLICY "movimenti: modifica per autenticati"
     ON public.movimenti_magazzino FOR UPDATE
-    USING (public.fn_is_admin())
-    WITH CHECK (public.fn_is_admin());
+    USING (auth.role() = 'authenticated')
+    WITH CHECK (auth.role() = 'authenticated');
 
-CREATE POLICY "movimenti: eliminazione solo admin"
+CREATE POLICY "movimenti: eliminazione per autenticati"
     ON public.movimenti_magazzino FOR DELETE
-    USING (public.fn_is_admin());
+    USING (auth.role() = 'authenticated');
 
 -- ============================================================
 -- GRANTS

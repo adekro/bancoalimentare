@@ -215,7 +215,7 @@ const NUCLEI_COLUMNS_CONFIG = [
   },
   {
     id: "titolare",
-    header: "Nominativo",
+    header: "Nominativo tesserato",
     value: (n: Nucleo) => {
       const t = getTitolare(n.componenti);
       return t ? `${t.cognome} ${t.nome}` : "—";
@@ -497,7 +497,10 @@ export default function Stampe() {
     const saved = localStorage.getItem("stampe_nuclei_columns");
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const savedColumns = JSON.parse(saved) as string[];
+        return savedColumns.includes("titolare")
+          ? savedColumns
+          : [...savedColumns, "titolare"];
       } catch (e) {
         console.error("Errore nel parsing delle preferenze colonne", e);
       }
