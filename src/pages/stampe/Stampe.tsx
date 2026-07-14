@@ -358,7 +358,10 @@ function getTitolare(componenti: Componente[]): Componente | undefined {
 }
 
 function getTesserato(componenti: Componente[]): Componente | undefined {
-  return componenti.find((c) => c.ruolo === "titolare");
+  return (
+    componenti.find((c) => c.ruolo === "titolare") ??
+    componenti.find((c) => c.ruolo === "capofamiglia")
+  );
 }
 
 function getUltimaIscrizione(iscrizioni: Iscrizione[]): Iscrizione | undefined {
