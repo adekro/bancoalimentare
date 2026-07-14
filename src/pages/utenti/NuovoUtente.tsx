@@ -218,6 +218,7 @@ export default function NuovoUtente() {
   const [tessDataScadenza, setTessDataScadenza] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isExcelImport, setIsExcelImport] = useState(false);
 
   useEffect(() => {
     const state = location.state as {
@@ -229,6 +230,7 @@ export default function NuovoUtente() {
 
     const importedPeople = state?.excelPersone;
     if (!importedPeople || importedPeople.length === 0) return;
+    setIsExcelImport(true);
 
     const cfIdx = state?.excelCfIdx ?? 0;
     const titIdx = state?.excelTitIdx ?? null; // null = stesso del capofamiglia
@@ -354,6 +356,45 @@ export default function NuovoUtente() {
       return;
     }
 
+    let bozzaTessera: { id: string; nucleo_id: string } | null = null;
+
+    if (normalizedTessNumero && tesseraYear) {
+      const startOfYear = `${tesseraYear}-01-01`;
+      const endOfYear = `${tesseraYear}-12-31`;
+      const { data: duplicateTessera, error: tesseraCheckErr } = await supabase
+        .from("iscrizioni")
+        .select("id, nucleo_id, nuclei!inner(stato)")
+        .eq("numero_tessera", normalizedTessNumero)
+        .gte("data_scadenza", startOfYear)
+        .lte("data_scadenza", endOfYear)
+        .limit(1)
+        .maybeSingle();
+
+      if (tesseraCheckErr) {
+        setError(tesseraCheckErr.message);
+        setLoading(false);
+        return;
+      }
+
+      const nucleoDuplicato = duplicateTessera?.nuclei as
+        | { stato: StatoNucleo }
+        | undefined;
+      if (duplicateTessera) {
+        if (isExcelImport && nucleoDuplicato?.stato === "bozza") {
+          bozzaTessera = {
+            id: duplicateTessera.id,
+            nucleo_id: duplicateTessera.nucleo_id,
+          };
+        } else {
+          setError(
+            `Numero tessera gia presente per l'anno di scadenza ${tesseraYear}.`,
+          );
+          setLoading(false);
+          return;
+        }
+      }
+    }
+
     if (normalizedNumeroNucleoFamiliare) {
       const { data: duplicateNucleo, error: nucleoCheckErr } = await supabase
         .from("nuclei")
@@ -368,7 +409,7 @@ export default function NuovoUtente() {
         return;
       }
 
-      if (duplicateNucleo) {
+      if (duplicateNucleo && duplicateNucleo.id !== bozzaTessera?.nucleo_id) {
         setError("Numero nucleo familiare gia presente.");
         setLoading(false);
         return;
@@ -378,7 +419,7 @@ export default function NuovoUtente() {
     if (normalizedCf) {
       const { data: duplicateCf, error: cfCheckErr } = await supabase
         .from("componenti")
-        .select("id")
+        .select("id, nucleo_id")
         .eq("codice_fiscale", normalizedCf)
         .limit(1)
         .maybeSingle();
@@ -389,62 +430,47 @@ export default function NuovoUtente() {
         return;
       }
 
-      if (duplicateCf) {
+      if (duplicateCf && duplicateCf.nucleo_id !== bozzaTessera?.nucleo_id) {
         setError("Codice fiscale gia presente su un altro nucleo.");
         setLoading(false);
         return;
       }
     }
 
-    if (normalizedTessNumero && tesseraYear) {
-      const startOfYear = `${tesseraYear}-01-01`;
-      const endOfYear = `${tesseraYear}-12-31`;
-      const { data: duplicateTessera, error: tesseraCheckErr } = await supabase
-        .from("iscrizioni")
+    const nucleoPayload = {
+      numero_nucleo_familiare: normalizedNumeroNucleoFamiliare || null,
+      numero_componenti: numeroComponentiValue,
+      telefono: telefono.trim() || null,
+      indirizzo: indirizzo.trim() || null,
+      zona,
+      stato,
+      archiviato: false,
+    };
+    let nucleoId = bozzaTessera?.nucleo_id;
+
+    if (nucleoId) {
+      const { error: nuclErr } = await supabase
+        .from("nuclei")
+        .update(nucleoPayload)
+        .eq("id", nucleoId);
+      if (nuclErr) {
+        setError(nuclErr.message);
+        setLoading(false);
+        return;
+      }
+    } else {
+      const { data: nuclData, error: nuclErr } = await supabase
+        .from("nuclei")
+        .insert(nucleoPayload)
         .select("id")
-        .eq("numero_tessera", normalizedTessNumero)
-        .gte("data_scadenza", startOfYear)
-        .lte("data_scadenza", endOfYear)
-        .limit(1)
-        .maybeSingle();
-
-      if (tesseraCheckErr) {
-        setError(tesseraCheckErr.message);
+        .single();
+      if (nuclErr || !nuclData) {
+        setError(nuclErr?.message ?? "Errore durante il salvataggio del nucleo.");
         setLoading(false);
         return;
       }
-
-      if (duplicateTessera) {
-        setError(
-          `Numero tessera gia presente per l'anno di scadenza ${tesseraYear}.`,
-        );
-        setLoading(false);
-        return;
-      }
+      nucleoId = nuclData.id;
     }
-
-    // 1. Insert nucleo
-    const { data: nuclData, error: nuclErr } = await supabase
-      .from("nuclei")
-      .insert({
-        numero_nucleo_familiare: normalizedNumeroNucleoFamiliare || null,
-        numero_componenti: numeroComponentiValue,
-        telefono: telefono.trim() || null,
-        indirizzo: indirizzo.trim() || null,
-        zona,
-        stato,
-        archiviato: false,
-      })
-      .select("id")
-      .single();
-
-    if (nuclErr || !nuclData) {
-      setError(nuclErr?.message ?? "Errore durante il salvataggio del nucleo.");
-      setLoading(false);
-      return;
-    }
-
-    const nucleoId = nuclData.id;
 
     // 2. Insert componenti
     const cfNorm = normalizedCf || null;
@@ -505,6 +531,18 @@ export default function NuovoUtente() {
       }
     });
 
+    if (bozzaTessera) {
+      const { error: deleteCompErr } = await supabase
+        .from("componenti")
+        .delete()
+        .eq("nucleo_id", nucleoId);
+      if (deleteCompErr) {
+        setError(deleteCompErr.message);
+        setLoading(false);
+        return;
+      }
+    }
+
     const { error: compErr } = await supabase
       .from("componenti")
       .insert(toInsert);
@@ -516,11 +554,19 @@ export default function NuovoUtente() {
 
     // 3. Insert prima iscrizione (se compilata)
     if (normalizedTessNumero) {
-      const { error: iscrErr } = await supabase.from("iscrizioni").insert({
-        nucleo_id: nucleoId,
-        numero_tessera: normalizedTessNumero,
-        data_scadenza: tessDataScadenza || null,
-      });
+      const { error: iscrErr } = bozzaTessera
+        ? await supabase
+            .from("iscrizioni")
+            .update({
+              numero_tessera: normalizedTessNumero,
+              data_scadenza: tessDataScadenza || null,
+            })
+            .eq("id", bozzaTessera.id)
+        : await supabase.from("iscrizioni").insert({
+            nucleo_id: nucleoId,
+            numero_tessera: normalizedTessNumero,
+            data_scadenza: tessDataScadenza || null,
+          });
       if (iscrErr) {
         setError(iscrErr.message);
         setLoading(false);
