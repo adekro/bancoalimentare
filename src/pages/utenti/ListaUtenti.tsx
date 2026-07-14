@@ -282,6 +282,11 @@ export default function ListaUtenti() {
   const [showArchiviati, setShowArchiviati] = useState(false);
   const [archivioId, setArchivioId] = useState<string | null>(null);
   const [archiving, setArchiving] = useState(false);
+  const [eliminaDefinitivamenteId, setEliminaDefinitivamenteId] = useState<
+    string | null
+  >(null);
+  const [eliminaDefinitivamenteLoading, setEliminaDefinitivamenteLoading] =
+    useState(false);
   const [rinnovoOpen, setRinnovoOpen] = useState(false);
   const [rinnovoLoading, setRinnovoLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
@@ -507,6 +512,40 @@ export default function ListaUtenti() {
       .eq("id", archivioId);
     setArchiving(false);
     setArchivioId(null);
+    load();
+  };
+
+  const handleEliminaDefinitivamente = async () => {
+    if (!eliminaDefinitivamenteId) return;
+
+    setEliminaDefinitivamenteLoading(true);
+    setError("");
+
+    const { error: distErr } = await supabase
+      .from("distribuzioni")
+      .delete()
+      .eq("nucleo_id", eliminaDefinitivamenteId);
+
+    if (distErr) {
+      setEliminaDefinitivamenteLoading(false);
+      setError(`Errore eliminazione distribuzioni: ${distErr.message}`);
+      return;
+    }
+
+    const { error: nucleoErr } = await supabase
+      .from("nuclei")
+      .delete()
+      .eq("id", eliminaDefinitivamenteId);
+
+    setEliminaDefinitivamenteLoading(false);
+
+    if (nucleoErr) {
+      setError(`Errore eliminazione nucleo: ${nucleoErr.message}`);
+      return;
+    }
+
+    setEliminaDefinitivamenteId(null);
+    setSuccessMsg("Il nucleo archiviato è stato eliminato definitivamente.");
     load();
   };
 
@@ -1533,6 +1572,17 @@ export default function ListaUtenti() {
                               )}
                             </IconButton>
                           </Tooltip>
+                          {showArchiviati && (
+                            <Tooltip title="Elimina definitivamente">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => setEliminaDefinitivamenteId(n.id)}
+                              >
+                                <DeleteForeverIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                         </Stack>
                       </TableCell>
                     </TableRow>
@@ -1650,6 +1700,42 @@ export default function ListaUtenti() {
               "Ripristina"
             ) : (
               "Archivia"
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={!!eliminaDefinitivamenteId}
+        onClose={() =>
+          !eliminaDefinitivamenteLoading &&
+          setEliminaDefinitivamenteId(null)
+        }
+      >
+        <DialogTitle color="error">Elimina definitivamente nucleo</DialogTitle>
+        <DialogContent>
+          <Alert severity="error">
+            Operazione irreversibile: verranno eliminati il nucleo archiviato e
+            tutti i dati relazionati, comprese le distribuzioni.
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setEliminaDefinitivamenteId(null)}
+            disabled={eliminaDefinitivamenteLoading}
+          >
+            Annulla
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleEliminaDefinitivamente}
+            disabled={eliminaDefinitivamenteLoading}
+          >
+            {eliminaDefinitivamenteLoading ? (
+              <CircularProgress size={20} color="inherit" />
+            ) : (
+              "Elimina definitivamente"
             )}
           </Button>
         </DialogActions>
