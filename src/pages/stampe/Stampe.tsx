@@ -352,6 +352,7 @@ const NUCLEI_COLUMNS_CONFIG = [
 function getTitolare(componenti: Componente[]): Componente | undefined {
   return (
     componenti.find((c) => c.ruolo === "titolare") ??
+    componenti.find((c) => Boolean(c.codice_fiscale)) ??
     componenti.find((c) => c.ruolo === "capofamiglia")
   );
 }
@@ -448,6 +449,9 @@ export default function Stampe() {
   const [loading, setLoading] = useState(true);
   const [nuclei, setNuclei] = useState<Nucleo[]>([]);
   const [filterZona, setFilterZona] = useState<string>("Tutte");
+  const [dataStampaNuclei, setDataStampaNuclei] = useState(() =>
+    new Date().toLocaleDateString("sv-SE"),
+  );
   const [filterDataDa, setFilterDataDa] = useState("");
   const [filterDataA, setFilterDataA] = useState("");
 
@@ -1273,6 +1277,15 @@ export default function Stampe() {
                     <MenuItem value="desc">Decrescente</MenuItem>
                   </Select>
                 </FormControl>
+                <TextField
+                  size="small"
+                  type="date"
+                  label="Data stampa"
+                  value={dataStampaNuclei}
+                  onChange={(e) => setDataStampaNuclei(e.target.value)}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                  sx={{ minWidth: 160 }}
+                />
                 <Autocomplete
                   multiple
                   size="small"
@@ -1330,7 +1343,7 @@ export default function Stampe() {
               >
                 Lista Nuclei
                 {filterZona !== "Tutte" ? ` — Zona ${filterZona}` : ""} —{" "}
-                {new Date().toLocaleDateString("it-IT")}
+                {fmtData(dataStampaNuclei)}
               </Typography>
 
               <TableContainer component={Paper} elevation={1}>
