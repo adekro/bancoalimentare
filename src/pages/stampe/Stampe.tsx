@@ -217,11 +217,11 @@ const NUCLEI_COLUMNS_CONFIG = [
     id: "titolare",
     header: "Nominativo tesserato",
     value: (n: Nucleo) => {
-      const t = getTitolare(n.componenti);
+      const t = getTesserato(n.componenti);
       return t ? `${t.cognome} ${t.nome}` : "—";
     },
     exportValue: (n: Nucleo) => {
-      const t = getTitolare(n.componenti);
+      const t = getTesserato(n.componenti);
       return t ? `${t.cognome} ${t.nome}` : "";
     },
   },
@@ -355,6 +355,10 @@ function getTitolare(componenti: Componente[]): Componente | undefined {
     componenti.find((c) => Boolean(c.codice_fiscale)) ??
     componenti.find((c) => c.ruolo === "capofamiglia")
   );
+}
+
+function getTesserato(componenti: Componente[]): Componente | undefined {
+  return componenti.find((c) => c.ruolo === "titolare");
 }
 
 function getUltimaIscrizione(iscrizioni: Iscrizione[]): Iscrizione | undefined {
