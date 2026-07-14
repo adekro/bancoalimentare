@@ -203,7 +203,8 @@ const NUCLEI_COLUMNS_CONFIG = [
   {
     id: "tessera",
     header: "N° Tessera",
-    value: (n: Nucleo) => getUltimaIscrizione(n.iscrizioni)?.numero_tessera ?? "—",
+    value: (n: Nucleo) =>
+      getUltimaIscrizione(n.iscrizioni)?.numero_tessera ?? "—",
     exportValue: (n: Nucleo) =>
       getUltimaIscrizione(n.iscrizioni)?.numero_tessera ?? "",
   },
@@ -240,7 +241,8 @@ const NUCLEI_COLUMNS_CONFIG = [
   {
     id: "scadenza",
     header: "Scadenza",
-    value: (n: Nucleo) => fmtData(getUltimaIscrizione(n.iscrizioni)?.data_scadenza),
+    value: (n: Nucleo) =>
+      fmtData(getUltimaIscrizione(n.iscrizioni)?.data_scadenza),
     exportValue: (n: Nucleo) =>
       getUltimaIscrizione(n.iscrizioni)?.data_scadenza ?? "",
   },
@@ -302,7 +304,8 @@ const NUCLEI_COLUMNS_CONFIG = [
     id: "nazione_nascita_p",
     header: "Nazione Nascita",
     value: (n: Nucleo) => getTitolare(n.componenti)?.nazione_nascita ?? "—",
-    exportValue: (n: Nucleo) => getTitolare(n.componenti)?.nazione_nascita ?? "",
+    exportValue: (n: Nucleo) =>
+      getTitolare(n.componenti)?.nazione_nascita ?? "",
   },
   {
     id: "nazionalita_p",
@@ -328,7 +331,8 @@ const NUCLEI_COLUMNS_CONFIG = [
     id: "invalido_p",
     header: "Invalido",
     value: (n: Nucleo) => (getTitolare(n.componenti)?.invalido ? "SI" : "NO"),
-    exportValue: (n: Nucleo) => (getTitolare(n.componenti)?.invalido ? "SI" : "NO"),
+    exportValue: (n: Nucleo) =>
+      getTitolare(n.componenti)?.invalido ? "SI" : "NO",
   },
   {
     id: "fascia_eta_p",
@@ -359,8 +363,8 @@ function getTitolare(componenti: Componente[]): Componente | undefined {
 
 function getTesserato(componenti: Componente[]): Componente | undefined {
   return (
-    componenti.find((c) => c.ruolo === "titolare") ??
-    componenti.find((c) => c.ruolo === "capofamiglia")
+    componenti.find((c) => c.ruolo === "capofamiglia") ??
+    componenti.find((c) => c.ruolo === "titolare")
   );
 }
 
@@ -370,7 +374,9 @@ function getUltimaIscrizione(iscrizioni: Iscrizione[]): Iscrizione | undefined {
   )[0];
 }
 
-function getPenultimaIscrizione(iscrizioni: Iscrizione[]): Iscrizione | undefined {
+function getPenultimaIscrizione(
+  iscrizioni: Iscrizione[],
+): Iscrizione | undefined {
   return [...iscrizioni].sort((a, b) =>
     (b.data_inizio ?? "").localeCompare(a.data_inizio ?? ""),
   )[1];
@@ -520,9 +526,13 @@ export default function Stampe() {
     const items: RiepilogoDateOption[] = [];
 
     [...distRows]
-      .sort((a, b) => b.data.localeCompare(a.data) || a.centro.localeCompare(b.centro))
+      .sort(
+        (a, b) =>
+          b.data.localeCompare(a.data) || a.centro.localeCompare(b.centro),
+      )
       .forEach((row) => {
-        const sigla = CENTRO_SIGLA[row.centro] ?? row.centro.slice(0, 1).toUpperCase();
+        const sigla =
+          CENTRO_SIGLA[row.centro] ?? row.centro.slice(0, 1).toUpperCase();
         const key = `${row.data}|${sigla}`;
         if (seen.has(key)) return;
         seen.add(key);
@@ -545,18 +555,25 @@ export default function Stampe() {
     }
 
     setSelectedRiepilogoDates((current) => {
-      const validCurrent = current.filter((value) =>
-        value.date === null ||
-        availableDistribuzioneDates.some((option) => option.key === value.key),
+      const validCurrent = current.filter(
+        (value) =>
+          value.date === null ||
+          availableDistribuzioneDates.some(
+            (option) => option.key === value.key,
+          ),
       );
       if (validCurrent.length > 0) return validCurrent;
       const defaults: RiepilogoDateOption[] = [];
       const orderedCenters = ["Duomo", "Medassino", "Pombio", "San Rocco"];
       orderedCenters.forEach((center) => {
-        const found = availableDistribuzioneDates.find((option) => option.center === center);
+        const found = availableDistribuzioneDates.find(
+          (option) => option.center === center,
+        );
         if (found) defaults.push(found);
       });
-      return defaults.length > 0 ? defaults : availableDistribuzioneDates.slice(0, 4);
+      return defaults.length > 0
+        ? defaults
+        : availableDistribuzioneDates.slice(0, 4);
     });
   }, [availableDistribuzioneDates]);
 
@@ -812,14 +829,16 @@ export default function Stampe() {
   });
 
   const riepilogoRows = useMemo<RiepilogoDistribuzioniRow[]>(() => {
-    const selectedRealDates = riepilogoDateColumns
-      .filter((item) => Boolean(item.date));
+    const selectedRealDates = riepilogoDateColumns.filter((item) =>
+      Boolean(item.date),
+    );
     if (riepilogoDateColumns.length === 0) return [];
 
     const firstSelectedDate = selectedRealDates[0]?.date ?? null;
     const filteredRows = distRows.filter((row) => {
       if (!row.nuclei || row.nuclei.archiviato) return false;
-      if (filterZona !== "Tutte" && row.nuclei.zona !== filterZona) return false;
+      if (filterZona !== "Tutte" && row.nuclei.zona !== filterZona)
+        return false;
       return true;
     });
 
@@ -857,10 +876,12 @@ export default function Stampe() {
       const rowDateKey = `${row.data}|${rowSigla}`;
 
       if (firstSelectedDate && row.data < firstSelectedDate) {
-        target.precedenti[row.centro] = (target.precedenti[row.centro] ?? 0) + 1;
+        target.precedenti[row.centro] =
+          (target.precedenti[row.centro] ?? 0) + 1;
       }
       if (riepilogoDateColumns.some((item) => item.key === rowDateKey)) {
-        target.dateValues[rowDateKey] = (target.dateValues[rowDateKey] ?? 0) + 1;
+        target.dateValues[rowDateKey] =
+          (target.dateValues[rowDateKey] ?? 0) + 1;
       }
     }
 
@@ -868,10 +889,16 @@ export default function Stampe() {
     for (let size = 1; size <= maxSize; size += 1) {
       const bucket = countsBySize.get(size);
       const precedenti = Object.fromEntries(
-        previousCenters.map((center) => [center, bucket?.precedenti[center] ?? 0]),
+        previousCenters.map((center) => [
+          center,
+          bucket?.precedenti[center] ?? 0,
+        ]),
       );
       const dateValues = Object.fromEntries(
-        riepilogoDateColumns.map((item) => [item.key, bucket?.dateValues[item.key] ?? 0]),
+        riepilogoDateColumns.map((item) => [
+          item.key,
+          bucket?.dateValues[item.key] ?? 0,
+        ]),
       );
 
       rows.push({
@@ -909,11 +936,14 @@ export default function Stampe() {
   const riepilogoDettaglioRows = useMemo<RiepilogoDettaglioRow[]>(() => {
     if (riepilogoDateColumns.length === 0) return [];
 
-    const selectedRealDates = riepilogoDateColumns.filter((item) => Boolean(item.date));
+    const selectedRealDates = riepilogoDateColumns.filter((item) =>
+      Boolean(item.date),
+    );
     const firstSelectedDate = selectedRealDates[0]?.date ?? null;
     const filteredRows = distRows.filter((row) => {
       if (!row.nuclei || row.nuclei.archiviato) return false;
-      if (filterZona !== "Tutte" && row.nuclei.zona !== filterZona) return false;
+      if (filterZona !== "Tutte" && row.nuclei.zona !== filterZona)
+        return false;
       return true;
     });
 
@@ -950,7 +980,9 @@ export default function Stampe() {
           tesseraAttuale: ultima?.numero_tessera ?? "",
           scadenzaTessera: fmtData(ultima?.data_scadenza),
           componenti,
-          precedenti: Object.fromEntries(previousCenters.map((center) => [center, 0])),
+          precedenti: Object.fromEntries(
+            previousCenters.map((center) => [center, 0]),
+          ),
           dateValues: Object.fromEntries(
             riepilogoDateColumns.map((item) => [item.key, 0]),
           ),
@@ -967,9 +999,13 @@ export default function Stampe() {
     }
 
     return [...byNucleo.values()].sort((a, b) => {
-      const luogoCmp = a.luogo.localeCompare(b.luogo, "it", { sensitivity: "base" });
+      const luogoCmp = a.luogo.localeCompare(b.luogo, "it", {
+        sensitivity: "base",
+      });
       if (luogoCmp !== 0) return luogoCmp;
-      const cognomeCmp = a.cognome.localeCompare(b.cognome, "it", { sensitivity: "base" });
+      const cognomeCmp = a.cognome.localeCompare(b.cognome, "it", {
+        sensitivity: "base",
+      });
       if (cognomeCmp !== 0) return cognomeCmp;
       return a.nome.localeCompare(b.nome, "it", { sensitivity: "base" });
     });
@@ -1124,17 +1160,15 @@ export default function Stampe() {
     const previousValues = orderedCenters.map((center) => ({
       label: CENTRO_SIGLA[center],
       value:
-        riepilogoRows.find((row) => row.key === "total")?.precedenti[center] ?? 0,
+        riepilogoRows.find((row) => row.key === "total")?.precedenti[center] ??
+        0,
     }));
 
     exportRiepilogoDistribuzioniDocXml({
       fileName: `riepilogo_distribuzioni_${new Date().toISOString().slice(0, 10)}.xls`,
       sheetName: "Riepilogo",
       titolo: `ELENCO FAMIGLIE ASSISTITE ${new Date().getFullYear()}`,
-      zonaLabel:
-        filterZona === "Tutte"
-          ? "Zona: tutte"
-          : `Zona: ${filterZona}`,
+      zonaLabel: filterZona === "Tutte" ? "Zona: tutte" : `Zona: ${filterZona}`,
       dateLabels: riepilogoDateColumns.map((item) => item.label),
       previousLegend: "PRECEDENTI",
       detailHeaders: riepilogoDettaglioMode
@@ -1160,13 +1194,21 @@ export default function Stampe() {
               row.scadenzaTessera,
               row.componenti ?? "",
             ],
-            previousValues: orderedCenters.map((center) => row.precedenti[center] ?? 0),
-            dateValues: riepilogoDateColumns.map((item) => row.dateValues[item.key] ?? null),
+            previousValues: orderedCenters.map(
+              (center) => row.precedenti[center] ?? 0,
+            ),
+            dateValues: riepilogoDateColumns.map(
+              (item) => row.dateValues[item.key] ?? null,
+            ),
           }))
         : riepilogoRows.map((row) => ({
             leftValues: [row.label],
-            previousValues: orderedCenters.map((center) => row.precedenti[center] ?? 0),
-            dateValues: riepilogoDateColumns.map((item) => row.dateValues[item.key] ?? null),
+            previousValues: orderedCenters.map(
+              (center) => row.precedenti[center] ?? 0,
+            ),
+            dateValues: riepilogoDateColumns.map(
+              (item) => row.dateValues[item.key] ?? null,
+            ),
           })),
     });
   }
@@ -1309,7 +1351,11 @@ export default function Stampe() {
                   }}
                   disableCloseOnSelect
                   renderInput={(params) => (
-                    <TextField {...params} label="Colonne" placeholder="Aggiungi..." />
+                    <TextField
+                      {...params}
+                      label="Colonne"
+                      placeholder="Aggiungi..."
+                    />
                   )}
                   sx={{ minWidth: 250, maxWidth: 400 }}
                   renderTags={(value, getTagProps) =>
@@ -1600,7 +1646,9 @@ export default function Stampe() {
                   size="small"
                   options={availableDistribuzioneDates}
                   value={selectedRiepilogoDates}
-                  onChange={(_, newValue) => setSelectedRiepilogoDates(newValue)}
+                  onChange={(_, newValue) =>
+                    setSelectedRiepilogoDates(newValue)
+                  }
                   getOptionLabel={(option) => option.label}
                   renderInput={(params) => (
                     <TextField
@@ -1610,7 +1658,9 @@ export default function Stampe() {
                     />
                   )}
                   sx={{ minWidth: 320, flex: 1, maxWidth: 680 }}
-                  isOptionEqualToValue={(option, value) => option.key === value.key}
+                  isOptionEqualToValue={(option, value) =>
+                    option.key === value.key
+                  }
                   renderTags={(value, getTagProps) =>
                     value.map((option, index) => (
                       <Chip
@@ -1628,7 +1678,9 @@ export default function Stampe() {
                   control={
                     <Checkbox
                       checked={riepilogoDettaglioMode}
-                      onChange={(e) => setRiepilogoDettaglioMode(e.target.checked)}
+                      onChange={(e) =>
+                        setRiepilogoDettaglioMode(e.target.checked)
+                      }
                     />
                   }
                   label="Dettaglio famiglie"
@@ -1661,10 +1713,17 @@ export default function Stampe() {
                 </Alert>
               ) : (
                 <Paper elevation={1} sx={{ p: 3 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                  <Typography
+                    variant="subtitle1"
+                    sx={{ fontWeight: 600, mb: 1 }}
+                  >
                     Export foglio manuale
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mb: 2 }}
+                  >
                     Genera un file XML con estensione <strong>.xls</strong>,
                     pensato per essere aperto in Excel e stampato.
                   </Typography>
